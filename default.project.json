@@ -4,20 +4,20 @@
     "$className": "DataModel",
 
     "ReplicatedStorage": {
-      "Shared": {
+      "RagdollRonin": {
         "$path": "src/shared"
       }
     },
 
     "ServerScriptService": {
-      "Server": {
+      "RagdollRonin": {
         "$path": "src/server"
       }
     },
 
     "StarterPlayer": {
       "StarterPlayerScripts": {
-        "Client": {
+        "RagdollRoninClient": {
           "$path": "src/client"
         }
       }
