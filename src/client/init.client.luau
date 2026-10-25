@@ -9,6 +9,9 @@ local StarterGui = game:GetService("StarterGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
+if not game:IsLoaded() then
+	game.Loaded:Wait() -- the shared simulation modules are required as a whole folder
+end
 local Shared = ReplicatedStorage:WaitForChild("RagdollRonin")
 local Remotes = Shared:WaitForChild("Remotes")
 
@@ -17,6 +20,7 @@ local InputController = require(script.InputController)
 local CombatCursorUI = require(script.CombatCursorUI)
 local AnatomyUI = require(script.AnatomyUI)
 local DebugOverlay = require(script.DebugOverlay)
+local Prediction = require(script.Prediction)
 
 -- default Roblox movement controls are irrelevant for the custom fighter
 task.spawn(function()
@@ -66,6 +70,7 @@ end
 local function onCharacter(model)
 	if isFighter(model) then
 		ctx.Fighter = model
+		Prediction.OnNewFighter(ctx, model)
 		CameraController.OnNewFighter(ctx, model)
 		CombatCursorUI.OnNewFighter(ctx, model)
 		AnatomyUI.OnNewFighter(ctx, model)
@@ -75,6 +80,7 @@ player:GetPropertyChangedSignal("Character"):Connect(function()
 	onCharacter(player.Character)
 end)
 
+Prediction.Init(ctx)
 CameraController.Init(ctx)
 InputController.Init(ctx)
 CombatCursorUI.Init(ctx)

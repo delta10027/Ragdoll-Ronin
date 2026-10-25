@@ -40,7 +40,7 @@ function DebugOverlay.Update(ctx)
 		label.Text = "no fighter"
 		return
 	end
-	local lines = { "RAGDOLL RONIN DEBUG" }
+	local lines = { "RAGDOLL RONIN DEBUG", "Prediction: " .. (ctx.PredictionStatus and ctx.PredictionStatus() or "?") }
 	for _, k in ipairs(FIELDS) do
 		local v = m:GetAttribute(k)
 		if v ~= nil then

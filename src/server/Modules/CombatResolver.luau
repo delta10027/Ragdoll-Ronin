@@ -25,13 +25,14 @@ local Shared = ReplicatedStorage.RagdollRonin
 local Config = require(Shared.Config)
 local Anatomy = require(Shared.Anatomy)
 local StateDefs = require(Shared.StateDefs)
-local Util = require(script.Parent.Util)
+local Util = require(Shared.Sim.Util)
 local Registry = require(script.Parent.Registry)
 local AnatomyService = require(script.Parent.AnatomyService)
 local Dismemberment = require(script.Parent.Dismemberment)
-local BalanceController = require(script.Parent.BalanceController)
-local SwordController = require(script.Parent.SwordController)
-local StateMachine = require(script.Parent.StateMachine)
+local BalanceController = require(Shared.Sim.BalanceController)
+local SwordController = require(Shared.Sim.SwordController)
+local StateMachine = require(Shared.Sim.StateMachine)
+local Runtime = require(Shared.Sim.Runtime)
 local BloodFX = require(script.Parent.BloodFX)
 local Feedback = require(script.Parent.Feedback)
 local DebugService = require(script.Parent.DebugService)
@@ -84,7 +85,7 @@ end
 ------------------------------------------------------------------ blade contacts
 -- returns "Stop" (stroke ends) or "Continue"
 local function resolveBladeContact(att, def, h)
-	local now = os.clock()
+	local now = Runtime.now()
 	local stroke = att.Attack.Stroke
 	if not def.Sword or not def.Sword.Blade.Parent then
 		return "Continue"
@@ -223,7 +224,7 @@ local function resolveBodyHit(att, target, h)
 	if stroke.Hits[key] then
 		return "Continue"
 	end
-	local now = os.clock()
+	local now = Runtime.now()
 	local last = att.Attack.SegmentHitTimes[key]
 	stroke.Hits[key] = true
 	if last and now - last < C.SegmentCooldown then

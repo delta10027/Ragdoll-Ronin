@@ -33,7 +33,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage.RagdollRonin
 local Config = require(Shared.Config)
 local Util = require(script.Parent.Util)
-local DebugService = require(script.Parent.DebugService)
+local Runtime = require(script.Parent.Runtime)
 local BodyShape = require(script.Parent.BodyShape)
 
 local SwordController = {}
@@ -209,7 +209,7 @@ end
 
 ------------------------------------------------------------------ pre-physics: aim -> target
 function SwordController.UpdateAim(f, dt, inp)
-	local now = os.clock()
+	local now = Runtime.now()
 	local st = f.State
 	local swordOK = f.Sword ~= nil and f.Caps.SwordArm > 0.05
 	local mode = "Ready"
@@ -226,7 +226,7 @@ function SwordController.UpdateAim(f, dt, inp)
 		if blocking then
 			f.Block.StartTime = now
 		end
-		if f.Sword then
+		if f.Sword and f.Sword.ParryZone then
 			f.Sword.ParryZone.CanQuery = blocking
 		end
 	end
@@ -238,7 +238,9 @@ function SwordController.UpdateAim(f, dt, inp)
 	elseif atk.ReleaseTime == nil then
 		atk.ReleaseTime = now
 	end
-	atk.FollowThrough = atk.Stroke ~= nil and atk.ReleaseTime ~= nil and (now - atk.ReleaseTime) < C.FollowThroughTime
+	-- (strokes are tracked on the server only; a predicting client knows one is open via StrokeActive)
+	local stroking = atk.Stroke ~= nil or atk.StrokeActive == true
+	atk.FollowThrough = stroking and atk.ReleaseTime ~= nil and (now - atk.ReleaseTime) < C.FollowThroughTime
 
 	-- controller cursor chases the requested cursor with inertia and a speed cap
 	local aim = f.Aim
@@ -324,7 +326,7 @@ function SwordController.StartStroke(f, dir)
 	atk.Stroke = {
 		Id = atk.StrokeCount,
 		Dir = dir,
-		Start = os.clock(),
+		Start = Runtime.now(),
 		Distance = 0,
 		LowTime = 0,
 		PeakSpeed = 0,
@@ -345,7 +347,7 @@ end
 
 function SwordController.Recoil(f, duration)
 	SwordController.EndStroke(f, "Recoil")
-	f.Attack.RecoilUntil = math.max(f.Attack.RecoilUntil, os.clock() + duration)
+	f.Attack.RecoilUntil = math.max(f.Attack.RecoilUntil, Runtime.now() + duration)
 end
 
 local function setPhase(f, phase)
@@ -375,7 +377,7 @@ function SwordController.Track(f, dt, inp)
 	local rel = tipVel - f.Parts.LowerTorso.AssemblyLinearVelocity
 	local speed = rel.Magnitude
 	atk.TipSpeed = speed
-	local now = os.clock()
+	local now = Runtime.now()
 
 	local canStrike = f.State == "Attacking" and now >= atk.RecoilUntil and f.Caps.SwordArm > 0.05
 	local s = atk.Stroke
@@ -430,7 +432,7 @@ function SwordController.OnTransition(f, from, to)
 	end
 	if to ~= "Blocking" and f.Block and f.Block.Active then
 		f.Block.Active = false
-		if f.Sword then
+		if f.Sword and f.Sword.ParryZone then
 			f.Sword.ParryZone.CanQuery = false
 		end
 	end

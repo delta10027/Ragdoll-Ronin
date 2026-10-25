@@ -5,7 +5,7 @@
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StateDefs = require(ReplicatedStorage.RagdollRonin.StateDefs)
-local DebugService = require(script.Parent.DebugService)
+local Runtime = require(script.Parent.Runtime)
 
 local StateMachine = {}
 local listeners = {}
@@ -16,14 +16,14 @@ end
 
 function StateMachine.Init(f)
 	f.State = "Idle"
-	f.StateTime = os.clock()
+	f.StateTime = Runtime.now()
 	f.StateData = {}
 	f.StateHistory = {}
 	f.Model:SetAttribute("State", "Idle")
 end
 
 function StateMachine.Elapsed(f)
-	return os.clock() - f.StateTime
+	return Runtime.now() - f.StateTime
 end
 
 function StateMachine.Can(f, to)
@@ -34,9 +34,9 @@ end
 local function apply(f, to, reason, data)
 	local from = f.State
 	f.State = to
-	f.StateTime = os.clock()
+	f.StateTime = Runtime.now()
 	f.StateData = data or {}
-	table.insert(f.StateHistory, string.format("%.2f %s->%s (%s)", os.clock(), from, to, tostring(reason)))
+	table.insert(f.StateHistory, string.format("%.2f %s->%s (%s)", Runtime.now(), from, to, tostring(reason)))
 	if #f.StateHistory > 20 then
 		table.remove(f.StateHistory, 1)
 	end
@@ -45,7 +45,7 @@ local function apply(f, to, reason, data)
 		f.Model:SetAttribute("StateReason", tostring(reason))
 	end
 	f.AnatomyDirty = true
-	DebugService.Transition(f, from, to, reason)
+	Runtime.Debug.Transition(f, from, to, reason)
 	for _, fn in ipairs(listeners) do
 		fn(f, from, to, reason)
 	end
@@ -57,7 +57,7 @@ function StateMachine.Set(f, to, reason, data)
 		return false
 	end
 	if not StateMachine.Can(f, to) then
-		DebugService.Log("rejected transition", f.Name, f.State, "->", to, reason)
+		Runtime.Debug.Log("rejected transition", f.Name, f.State, "->", to, reason)
 		return false
 	end
 	apply(f, to, reason, data)
