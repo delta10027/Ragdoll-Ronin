@@ -1,7 +1,10 @@
 --[[
 	Ragdoll Ronin - server bootstrap and the single centralized update loop.
 
-	PreSimulation  (before physics): state logic -> aim/sword target -> motors & drives
+	Controllers (before physics): state logic -> aim/sword target -> motors & drives
+	  normally in PreSimulation; under server authority (Workspace.AuthorityMode = Server) inside
+	  RunService:BindToSimulation, so the owning client can run the same step to predict its own
+	  fighter (see Shared.Sim.SimState). Validation, disarming and debug then run on Heartbeat.
 	PostSimulation (after physics):  blade stroke tracking -> swept hit detection -> combat resolution
 	Bleeding runs on its own bounded interval; anatomy snapshots are pushed to owners at a fixed rate.
 	Each fighter is updated inside pcall so one broken fighter cannot stop combat for everyone.
@@ -15,11 +18,11 @@ local StateDefs = require(Shared.StateDefs)
 local Modules = script.Parent.Modules
 local CollisionSetup = require(Modules.CollisionSetup)
 local Registry = require(Modules.Registry)
-local Input = require(Modules.Input)
-local StateMachine = require(Modules.StateMachine)
-local BalanceController = require(Modules.BalanceController)
-local SwordController = require(Modules.SwordController)
-local MotorController = require(Modules.MotorController)
+local Input = require(Shared.Sim.Input)
+local StateMachine = require(Shared.Sim.StateMachine)
+local BalanceController = require(Shared.Sim.BalanceController)
+local SwordController = require(Shared.Sim.SwordController)
+local MotorController = require(Shared.Sim.MotorController)
 local HitDetection = require(Modules.HitDetection)
 local CombatResolver = require(Modules.CombatResolver)
 local AnatomyService = require(Modules.AnatomyService)
@@ -29,6 +32,10 @@ local NetService = require(Modules.NetService)
 local DebugService = require(Modules.DebugService)
 local DevTools = require(Modules.DevTools)
 local Dismemberment = require(Modules.Dismemberment)
+local Runtime = require(Shared.Sim.Runtime)
+local SimState = require(Shared.Sim.SimState)
+
+Runtime.Debug = DebugService
 
 CollisionSetup.Init()
 DebugService.Init()
@@ -68,18 +75,45 @@ local function guarded(f, phase, fn, ...)
 	end
 end
 
+-- a crippled sword hand cannot hold the katana, however it was injured
+local function checkDisarm(f)
+	if f.Sword and not f.Dead and f.Anatomy.Segments.RightHand.Integrity < Config.Anatomy.DisarmHandIntegrity then
+		Dismemberment.DropSword(f, f.Parts.UpperTorso and f.Parts.UpperTorso.CFrame.LookVector * 6)
+	end
+end
+
+-- the predictable part of a fighter's frame (identical on a predicting client)
+local function stepControllers(f, dt)
+	local inp = Input.Get(f)
+	BalanceController.Update(f, dt, inp)
+	SwordController.UpdateAim(f, dt, inp)
+	MotorController.Apply(f, dt, inp)
+end
+
 local function stepPre(f, dt)
 	if f.Removed or not Lifecycle.Validate(f) then
 		return
 	end
-	local inp = Input.Get(f)
-	-- a crippled sword hand cannot hold the katana, however it was injured
-	if f.Sword and not f.Dead and f.Anatomy.Segments.RightHand.Integrity < Config.Anatomy.DisarmHandIntegrity then
-		Dismemberment.DropSword(f, f.Parts.UpperTorso and f.Parts.UpperTorso.CFrame.LookVector * 6)
+	checkDisarm(f)
+	stepControllers(f, dt)
+	DebugService.Tick(f)
+end
+
+-- server authority: only simulation-safe work runs inside the bound step; the state it leaves is
+-- published for client prediction
+local function stepSim(f, dt)
+	if f.Removed or not f.Model.Parent or not f.Parts.LowerTorso or not f.Parts.LowerTorso.Parent then
+		return
 	end
-	BalanceController.Update(f, dt, inp)
-	SwordController.UpdateAim(f, dt, inp)
-	MotorController.Apply(f, dt, inp)
+	stepControllers(f, dt)
+	SimState.Store(f)
+end
+
+local function stepHeartbeat(f)
+	if f.Removed or not Lifecycle.Validate(f) then
+		return
+	end
+	checkDisarm(f)
 	DebugService.Tick(f)
 end
 
@@ -96,11 +130,24 @@ local function stepPost(f, dt)
 	end
 end
 
-RunService.PreSimulation:Connect(function(dt)
-	for _, f in ipairs(Registry.List()) do
-		guarded(f, "pre", stepPre, f, dt)
-	end
-end)
+if Runtime.ServerAuthority then
+	RunService:BindToSimulation(function(dt)
+		for _, f in ipairs(Registry.List()) do
+			guarded(f, "sim", stepSim, f, dt)
+		end
+	end, Enum.StepFrequency.Hz60)
+	RunService.Heartbeat:Connect(function()
+		for _, f in ipairs(Registry.List()) do
+			guarded(f, "heartbeat", stepHeartbeat, f)
+		end
+	end)
+else
+	RunService.PreSimulation:Connect(function(dt)
+		for _, f in ipairs(Registry.List()) do
+			guarded(f, "pre", stepPre, f, dt)
+		end
+	end)
+end
 
 RunService.PostSimulation:Connect(function(dt)
 	for _, f in ipairs(Registry.List()) do
@@ -129,17 +176,20 @@ local function guardOwnership()
 end
 
 RunService.Heartbeat:Connect(function(dt)
-	-- prompt re-claim after the body's assembly changed (wound marks, stumps, dropped sword)
-	for _, f in ipairs(Registry.List()) do
-		if f.OwnershipDirty and f.OwnershipDirty > 0 and not f.Removed then
-			f.OwnershipDirty -= 1
-			CharacterBuilder.ClaimOwnership(f.Model)
+	-- prompt re-claim after the body's assembly changed (wound marks, stumps, dropped sword).
+	-- Under server authority the engine keeps everything server-owned and predicts instead.
+	if not Runtime.ServerAuthority then
+		for _, f in ipairs(Registry.List()) do
+			if f.OwnershipDirty and f.OwnershipDirty > 0 and not f.Removed then
+				f.OwnershipDirty -= 1
+				CharacterBuilder.ClaimOwnership(f.Model)
+			end
 		end
-	end
-	ownerAccum += dt
-	if ownerAccum >= 1 then
-		ownerAccum = 0
-		pcall(guardOwnership)
+		ownerAccum += dt
+		if ownerAccum >= 1 then
+			ownerAccum = 0
+			pcall(guardOwnership)
+		end
 	end
 	bleedAccum += dt
 	if bleedAccum >= Config.Blood.TickInterval then
@@ -170,4 +220,4 @@ RunService.Heartbeat:Connect(function(dt)
 	end
 end)
 
-print("[RR] Ragdoll Ronin combat server ready")
+print("[RR] Ragdoll Ronin combat server ready" .. (Runtime.ServerAuthority and " (server authority + client prediction)" or ""))

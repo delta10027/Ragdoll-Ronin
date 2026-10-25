@@ -18,6 +18,7 @@ local Shared = ReplicatedStorage.RagdollRonin
 local Config = require(Shared.Config)
 local Anatomy = require(Shared.Anatomy)
 local SwordBuilder = require(script.Parent.SwordBuilder)
+local Runtime = require(Shared.Sim.Runtime)
 
 local CharacterBuilder = {}
 
@@ -61,6 +62,8 @@ function CharacterBuilder.Build(spawnCF, opts)
 	local model = Instance.new("Model")
 	model.Name = opts.Name or "Fighter"
 	model:SetAttribute("RR_Fighter", true)
+	-- streaming (required by server authority) must deliver the body whole or not at all
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 
 	local jointsFolder = Instance.new("Folder")
 	jointsFolder.Name = "Joints"
@@ -153,6 +156,7 @@ function CharacterBuilder.Build(spawnCF, opts)
 				rec.Drive = ao
 				rec.TargetAtt = dp
 				rec.TargetBase = dp.CFrame
+				dp:SetAttribute("BaseCFrame", dp.CFrame) -- rest target, for client prediction
 				table.insert(rec.Instances, ao)
 				table.insert(rec.Instances, dc)
 				table.insert(rec.Instances, dp)
@@ -316,6 +320,9 @@ end
 
 -- Server-owned physics: clients never simulate fighter bodies (authority + exploit resistance).
 function CharacterBuilder.ClaimOwnership(model)
+	if Runtime.ServerAuthority then
+		return -- the engine keeps server authority itself (and predicts the owner's fighter)
+	end
 	for _, d in ipairs(model:GetDescendants()) do
 		if d:IsA("BasePart") and not d.Anchored then
 			pcall(d.SetNetworkOwner, d, nil)

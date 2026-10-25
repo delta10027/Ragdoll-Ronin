@@ -20,7 +20,7 @@ local Config = require(Shared.Config)
 local StateDefs = require(Shared.StateDefs)
 local Util = require(script.Parent.Util)
 local StateMachine = require(script.Parent.StateMachine)
-local DebugService = require(script.Parent.DebugService)
+local Runtime = require(script.Parent.Runtime)
 
 local BalanceController = {}
 
@@ -64,7 +64,7 @@ local function retryDelay(f)
 end
 
 local function canEverStand(f)
-	return f.Caps.LegSupport >= R.MinLegSupport and not f.Anatomy.Incapacitated
+	return f.Caps.LegSupport >= R.MinLegSupport and not f.Caps.Incapacitated
 end
 
 local function headingYaw(f)
@@ -106,10 +106,10 @@ function BalanceController.Stagger(f, duration, pushDir, reason)
 		return false
 	end
 	if f.State == "Staggered" then
-		f.StateData.Until = math.max(f.StateData.Until, os.clock() + duration)
+		f.StateData.Until = math.max(f.StateData.Until, Runtime.now() + duration)
 		return true
 	end
-	return StateMachine.Set(f, "Staggered", reason or "Stagger", { Until = os.clock() + duration, PushDir = pushDir and Util.unit(Util.flat(pushDir)) })
+	return StateMachine.Set(f, "Staggered", reason or "Stagger", { Until = Runtime.now() + duration, PushDir = pushDir and Util.unit(Util.flat(pushDir)) })
 end
 
 function BalanceController.OffBalance(f, pushDir, reason)
@@ -130,7 +130,7 @@ function BalanceController.Update(f, dt, inp)
 	if st == "Dead" then
 		return
 	end
-	local now = os.clock()
+	local now = Runtime.now()
 	local pelvis = f.Parts.LowerTorso
 	local caps = f.Caps
 
@@ -142,7 +142,7 @@ function BalanceController.Update(f, dt, inp)
 
 	-- incapacitation or loss of both legs takes the fighter down from any active state
 	if (StateDefs.Upright[st] or st == "Recovering") and not canEverStand(f) then
-		StateMachine.Set(f, "Falling", f.Anatomy.Incapacitated and "Incapacitated" or "No leg support")
+		StateMachine.Set(f, "Falling", f.Caps.Incapacitated and "Incapacitated" or "No leg support")
 		return
 	end
 
@@ -225,7 +225,7 @@ function BalanceController.Update(f, dt, inp)
 			if canEverStand(f) then
 				StateMachine.Set(f, "GroundedRecovery", "Settled", { Wait = retryDelay(f), FaceDown = faceDown })
 			else
-				StateMachine.Set(f, "SeverelyInjured", f.Anatomy.Incapacitated and "Incapacitated" or "Cannot stand", { FaceDown = faceDown })
+				StateMachine.Set(f, "SeverelyInjured", f.Caps.Incapacitated and "Incapacitated" or "Cannot stand", { FaceDown = faceDown })
 			end
 		end
 	elseif st == "GroundedRecovery" then
@@ -280,7 +280,7 @@ function BalanceController.Update(f, dt, inp)
 		or (StateDefs.Ground[st] and st or "-")
 	if phase ~= f.LastRecoveryPhase then
 		f.LastRecoveryPhase = phase
-		DebugService.Attr(f, "RecoveryPhase", phase)
+		Runtime.Debug.Attr(f, "RecoveryPhase", phase)
 	end
 end
 

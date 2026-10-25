@@ -14,6 +14,9 @@ local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage:WaitForChild("RagdollRonin"):WaitForChild("Config"))
 local CameraController = require(script.Parent.CameraController)
+local Sim = ReplicatedStorage:WaitForChild("RagdollRonin"):WaitForChild("Sim")
+local Runtime = require(Sim:WaitForChild("Runtime"))
+local SimInput = require(Sim:WaitForChild("SimInput"))
 
 local InputController = {}
 local A = Config.Aim
@@ -97,6 +100,13 @@ function InputController.Update(ctx, dt)
 	table.insert(s.History, { t = now, u = s.AimU, v = s.AimV })
 	while #s.History > 2 and now - s.History[1].t > 0.3 do
 		table.remove(s.History, 1)
+	end
+
+	-- server authority: intent goes through InputActions every frame (predicted locally, replayed
+	-- on the server) instead of the RemoteEvent
+	if Runtime.ServerAuthority then
+		SimInput.Fire(ctx.Player, s.Move, ctx.Camera.Yaw, s.AimU, s.AimV, s.M1, s.M2)
+		return
 	end
 
 	-- a button press/release goes out immediately instead of waiting for the next send slot

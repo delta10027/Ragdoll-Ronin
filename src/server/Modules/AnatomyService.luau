@@ -19,7 +19,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage.RagdollRonin
 local Config = require(Shared.Config)
 local Anatomy = require(Shared.Anatomy)
-local Util = require(script.Parent.Util)
+local Util = require(Shared.Sim.Util)
 
 local AnatomyService = {}
 local S = Config.Scale
@@ -120,6 +120,13 @@ function AnatomyService.UpdateCaps(f)
 
 	local incapacitated = bloodFrac < B.Incapacitated or A.PendingDeath ~= nil or A.Organs.Brain.Health < 60
 	A.Incapacitated = incapacitated
+	caps.Incapacitated = incapacitated
+
+	-- per-segment drive strength for the motor controller (shared simulation code has no anatomy)
+	f.SegFactor = f.SegFactor or {}
+	for name, rec in pairs(seg) do
+		f.SegFactor[name] = segFactor(rec)
+	end
 end
 
 function AnatomyService.SegmentFactor(f, segName)

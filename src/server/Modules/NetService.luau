@@ -8,15 +8,19 @@
 	  The server converts this INTENT into motion itself (speed caps, inertia, physical drives),
 	  so no packet can move the sword faster than physics allows or declare a hit/damage.
 	CombatAction (RemoteEvent): "Recover" | "Reset", cooldown limited.
+	Under server authority the per-frame intent comes from InputActions instead (Sim.SimInput,
+	created here per player); CombatInput packets are then ignored.
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local Shared = ReplicatedStorage.RagdollRonin
 local Config = require(Shared.Config)
 local Registry = require(script.Parent.Registry)
-local Util = require(script.Parent.Util)
-local BalanceController = require(script.Parent.BalanceController)
+local Util = require(Shared.Sim.Util)
+local BalanceController = require(Shared.Sim.BalanceController)
 local DebugService = require(script.Parent.DebugService)
+local Runtime = require(Shared.Sim.Runtime)
+local SimInput = require(Shared.Sim.SimInput)
 
 local NetService = {}
 local N = Config.Network
@@ -52,6 +56,9 @@ function NetService.RejectCount(player)
 end
 
 local function onInput(player, seq, mx, mz, yaw, u, v, buttons)
+	if Runtime.ServerAuthority then
+		return
+	end
 	if not allow(player) then
 		return reject(player, "rate")
 	end
@@ -122,6 +129,12 @@ function NetService.Init()
 	local remotes = Shared.Remotes
 	remotes.CombatInput.OnServerEvent:Connect(onInput)
 	remotes.CombatAction.OnServerEvent:Connect(onAction)
+	if Runtime.ServerAuthority then
+		Players.PlayerAdded:Connect(SimInput.Setup)
+		for _, p in ipairs(Players:GetPlayers()) do
+			SimInput.Setup(p)
+		end
+	end
 	Players.PlayerRemoving:Connect(function(p)
 		buckets[p] = nil
 		rejects[p] = nil

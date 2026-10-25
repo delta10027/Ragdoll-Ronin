@@ -8,10 +8,12 @@
 	    body toward the cursor and forward, so sweeping the cursor sweeps the tip through an arc.
 	    Centre of the disk = blade straight ahead and arms extended (thrust). Pushing the cursor to
 	    the top draws the sword back over the head (blade behind the head), so dragging it down
-	    from there is a full vertical cut.
-	  GUARD pose: the cursor picks the threatened side; the blade is laid ACROSS that line
-	    (perpendicular to the radial direction) with the edge facing the threat. Upward threats
-	    hold the blade flat across above the head (high block against vertical cuts).
+	    from there is a full vertical cut. The upper diagonals raise the sword over that shoulder
+	    and the lower diagonals finish at the opposite hip, so corner-to-corner is a diagonal cut.
+	  GUARD pose: the cursor picks the threatened side; key poses (Config.Aim.GuardKeys) hold the
+	    blade out beyond the body on that side with the edge facing the threat, e.g. flat across
+	    above the head for an upward threat. Blades physically collide (SwordBuilder collider),
+	    so a held guard stops a swing where they meet.
 	  EDGE: while swinging, the cutting edge turns to face the direction the blade actually moves
 	    (rate limited), so a deliberate stroke leads with the edge and a sloppy one hits with the
 	    flat. While wound up overhead the edge already faces the coming downward cut.
@@ -31,7 +33,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage.RagdollRonin
 local Config = require(Shared.Config)
 local Util = require(script.Parent.Util)
-local DebugService = require(script.Parent.DebugService)
+local Runtime = require(script.Parent.Runtime)
 local BodyShape = require(script.Parent.BodyShape)
 
 local SwordController = {}
@@ -67,28 +69,68 @@ end
 local READY_POS = A.ReadyGrip * S
 local READY_DIR = A.ReadyBlade.Unit
 local WINDUP_DIR = A.WindupBlade.Unit
-local HIGH_GUARD_POS = A.HighGuardGrip * S
-local HIGH_GUARD_DIR = A.HighGuardBlade.Unit
 -- blade point whose motion defines "the direction the cut travels" (mid-blade toward the tip)
 local CUT_POINT = Config.Sword.HandleLength * 0.25 + Config.Sword.BladeLength * 0.6
 
--- Returns pos, dir and the windup weight (0 = normal attack pose, 1 = fully drawn back overhead).
+-- Key poses are authored unscaled in Config; angle 0 = cursor straight up, clockwise (u right)
+local function scaledKey(k)
+	return { Pos = k.Grip * S, Dir = k.Blade.Unit }
+end
+local GUARD_KEYS = {}
+for i, k in ipairs(A.GuardKeys) do
+	GUARD_KEYS[i] = scaledKey(k)
+end
+local GUARD_CENTER = scaledKey(A.GuardCenter)
+local DIAGONALS = {}
+for _, k in ipairs(A.DiagonalKeys) do
+	local d = scaledKey(k)
+	d.Angle = math.rad(k.Angle)
+	d.Windup = k.Windup == true
+	table.insert(DIAGONALS, d)
+end
+
+local function cursorAngle(u, v)
+	return math.atan2(u, v) % (2 * math.pi)
+end
+
+-- Returns pos, dir and the windup weight (0 = normal attack pose, 1 = fully drawn back: overhead
+-- or over a shoulder, where the edge should already face the coming cut).
 local function attackPose(u, v)
 	local r2 = math.min(1, u * u + v * v)
 	-- cross-body poses (sword hand on the left) sit further out so the arm clears the chest
 	local depth = A.GripDepth + A.ThrustDepth * (1 - r2) + A.CrossBodyDepth * math.max(0, -u)
-	local pos = Vector3.new(u * A.GripSpreadX, A.GripBaseY + v * A.GripSpreadY, -depth)
+	local spread = u * A.GripSpreadX * (u < 0 and A.CrossBodySpread or 1)
+	local pos = Vector3.new(spread, A.GripBaseY + v * A.GripSpreadY, -depth) * S
 	local dir = Vector3.new(u * A.BladeOutward, v * A.BladeOutward + A.BladeLift, -1).Unit
 	-- above WindupStart the sword is drawn back over the head; the blade rotates through vertical,
 	-- so sweeping the cursor down from the top is one continuous vertical cut
 	local x = math.clamp((v - A.WindupStart) / (1 - A.WindupStart), 0, 1)
 	if x > 0 then
-		local grip = A.WindupGrip + Vector3.new(u * A.WindupSpreadX, 0, 0)
+		local grip = (A.WindupGrip + Vector3.new(u * A.WindupSpreadX, 0, 0)) * S
 		local blade = Util.unit(WINDUP_DIR + Vector3.new(u * A.WindupBladeOutward, 0, 0), WINDUP_DIR)
 		pos = pos:Lerp(grip, Util.smoothstep(x * A.WindupPosLead))
 		dir = Util.slerpUnit(dir, blade, Util.smoothstep(x))
 	end
-	return pos * S, dir, x
+	-- diagonals: sword raised over a shoulder, cut down across the body to the opposite hip
+	local r = math.sqrt(r2)
+	local wr = Util.smoothstep((r - A.DiagonalRimStart) / (1 - A.DiagonalRimStart))
+	if wr > 0 then
+		local ang = cursorAngle(u, v)
+		for _, d in ipairs(DIAGONALS) do
+			local off = math.abs(Util.angleDelta(ang, d.Angle))
+			local w = Util.smoothstep(1 - off / math.rad(A.DiagonalWidth)) * wr
+			if w > 0 then
+				pos = pos:Lerp(d.Pos, w)
+				dir = Util.slerpUnit(dir, d.Dir, w)
+				if d.Windup then
+					x = math.max(x, w)
+				end
+			end
+		end
+	end
+	-- out at the rim (sides and above) the edge pre-aims at a cut back through the centre
+	local prep = Util.smoothstep((r - A.RimPrepStart) / (1 - A.RimPrepStart)) * Util.smoothstep((v + 0.4) / 0.4)
+	return pos, dir, math.max(x, prep)
 end
 
 -- Direction a point down the blade travels when the cursor moves along (du, dv): the edge leads it
@@ -103,40 +145,27 @@ local function cutDirection(u, v, du, dv, fallback)
 	return Util.unit((p1 + d1 * CUT_POINT) - (p0 + d0 * CUT_POINT), fallback)
 end
 
-local function guardPose(aim, u, v)
+-- Guard: eight key poses around the disk (each held out beyond the body on its side so a real
+-- swing meets the blade before the body), blended by cursor angle; near the centre they blend
+-- into a central guard in front of the chin.
+local function guardPose(u, v)
 	local r = math.sqrt(u * u + v * v)
 	local ru, rv = 0, 1
 	if r >= 0.2 then
 		ru, rv = u / r, v / r
 	end
-	-- blade lies across the threatened line. Of the two ways along it prefer tip up and to the
-	-- right (the hand order on the hilt makes those reachable); hysteresis stops it flipping
-	-- back and forth near the switch-over.
-	local du, dv = -rv, ru
-	local pref = du * 0.6 + dv * 0.8
-	if not aim.GuardSign then
-		aim.GuardSign = pref >= 0 and 1 or -1
-	elseif pref * aim.GuardSign < -0.3 then
-		aim.GuardSign = -aim.GuardSign
-	end
-	du, dv = du * aim.GuardSign, dv * aim.GuardSign
-	local dir = Vector3.new(du, dv, -0.35).Unit
-	local reach = math.clamp(r, 0.35, 1)
-	local blockPoint = Vector3.new(ru * A.GuardRadius * reach, A.GuardBaseY + rv * A.GuardRadius * reach, -A.GuardDepth) * S
-	local pos = blockPoint - dir * (Config.Sword.BladeLength * A.GuardBladeFraction + Config.Sword.HandleLength * 0.3)
-	-- hands stay out in front of the body
-	pos = Vector3.new(pos.X, pos.Y, math.min(pos.Z, -A.GuardHandDepth * S))
+	local n = #GUARD_KEYS
+	local a = cursorAngle(ru, rv) / (2 * math.pi) * n
+	local i = math.floor(a)
+	local t = Util.smoothstep(a - i)
+	local k0, k1 = GUARD_KEYS[i % n + 1], GUARD_KEYS[(i + 1) % n + 1]
+	local pos = k0.Pos:Lerp(k1.Pos, t)
+	local dir = Util.slerpUnit(k0.Dir, k1.Dir, t)
+	local w = Util.smoothstep((r - A.GuardRimStart) / (A.GuardRimFull - A.GuardRimStart))
+	pos = GUARD_CENTER.Pos:Lerp(pos, w)
+	dir = Util.slerpUnit(GUARD_CENTER.Dir, dir, w)
+	-- the edge faces the threat (its roll is then chosen for reach in UpdateAim)
 	local edge = Vector3.new(ru, rv, -0.2)
-	-- upward threats use the high-guard layout (blade flat across, hands front-left): fully out at
-	-- the rim it sits above the head against vertical cuts, nearer the centre it drops to face height
-	local hx = math.clamp((rv - A.HighGuardStart) / (1 - A.HighGuardStart), 0, 1)
-	if hx > 0 then
-		local w = Util.smoothstep(hx)
-		local highPos = HIGH_GUARD_POS - Vector3.new(0, (1 - reach) * A.HighGuardDrop * S, 0)
-		pos = pos:Lerp(highPos, w)
-		dir = Util.slerpUnit(dir, HIGH_GUARD_DIR, w)
-		edge = edge:Lerp(Vector3.yAxis, w)
-	end
 	return pos, dir, edge
 end
 
@@ -180,7 +209,7 @@ end
 
 ------------------------------------------------------------------ pre-physics: aim -> target
 function SwordController.UpdateAim(f, dt, inp)
-	local now = os.clock()
+	local now = Runtime.now()
 	local st = f.State
 	local swordOK = f.Sword ~= nil and f.Caps.SwordArm > 0.05
 	local mode = "Ready"
@@ -197,7 +226,7 @@ function SwordController.UpdateAim(f, dt, inp)
 		if blocking then
 			f.Block.StartTime = now
 		end
-		if f.Sword then
+		if f.Sword and f.Sword.ParryZone then
 			f.Sword.ParryZone.CanQuery = blocking
 		end
 	end
@@ -209,7 +238,9 @@ function SwordController.UpdateAim(f, dt, inp)
 	elseif atk.ReleaseTime == nil then
 		atk.ReleaseTime = now
 	end
-	atk.FollowThrough = atk.Stroke ~= nil and atk.ReleaseTime ~= nil and (now - atk.ReleaseTime) < C.FollowThroughTime
+	-- (strokes are tracked on the server only; a predicting client knows one is open via StrokeActive)
+	local stroking = atk.Stroke ~= nil or atk.StrokeActive == true
+	atk.FollowThrough = stroking and atk.ReleaseTime ~= nil and (now - atk.ReleaseTime) < C.FollowThroughTime
 
 	-- controller cursor chases the requested cursor with inertia and a speed cap
 	local aim = f.Aim
@@ -236,7 +267,7 @@ function SwordController.UpdateAim(f, dt, inp)
 	aim.Ready += ((mode == "Ready" and 1 or 0) - aim.Ready) * math.min(1, A.ReadyBlendRate * dt)
 
 	local apos, adir, windup = attackPose(aim.U, aim.V)
-	local gpos, gdir, gedge = guardPose(aim, aim.U, aim.V)
+	local gpos, gdir, gedge = guardPose(aim.U, aim.V)
 	local g = aim.Guard
 	local pos = apos:Lerp(gpos, g)
 	local dir = Util.slerpUnit(adir, gdir, g)
@@ -249,10 +280,11 @@ function SwordController.UpdateAim(f, dt, inp)
 	if mode == "Attack" then
 		wantEdge = spd > A.EdgeMinSpeed and cutDirection(aim.U, aim.V, aim.VU, aim.VV, aim.Edge) or aim.Edge
 		if windup > 0 then
-			-- while drawn back the edge already faces the coming downward cut (the spine leads
-			-- the backswing), so the cut starts edge-first instead of turning the blade mid-swing
-			local down = cutDirection(aim.U, aim.V, 0, -1, wantEdge)
-			wantEdge = Util.unit(wantEdge:Lerp(down, Util.smoothstep(windup * 2)), down)
+			-- while drawn back the edge already faces the coming cut (down through the centre of
+			-- the disk; the spine leads the backswing), so the cut starts edge-first instead of
+			-- turning the blade mid-swing
+			local cut = cutDirection(aim.U, aim.V, -aim.U, -aim.V, wantEdge)
+			wantEdge = Util.unit(wantEdge:Lerp(cut, Util.smoothstep(windup * 2)), cut)
 		end
 	elseif mode == "Ready" then
 		wantEdge = DEFAULT_EDGE
@@ -294,7 +326,7 @@ function SwordController.StartStroke(f, dir)
 	atk.Stroke = {
 		Id = atk.StrokeCount,
 		Dir = dir,
-		Start = os.clock(),
+		Start = Runtime.now(),
 		Distance = 0,
 		LowTime = 0,
 		PeakSpeed = 0,
@@ -315,7 +347,7 @@ end
 
 function SwordController.Recoil(f, duration)
 	SwordController.EndStroke(f, "Recoil")
-	f.Attack.RecoilUntil = math.max(f.Attack.RecoilUntil, os.clock() + duration)
+	f.Attack.RecoilUntil = math.max(f.Attack.RecoilUntil, Runtime.now() + duration)
 end
 
 local function setPhase(f, phase)
@@ -345,7 +377,7 @@ function SwordController.Track(f, dt, inp)
 	local rel = tipVel - f.Parts.LowerTorso.AssemblyLinearVelocity
 	local speed = rel.Magnitude
 	atk.TipSpeed = speed
-	local now = os.clock()
+	local now = Runtime.now()
 
 	local canStrike = f.State == "Attacking" and now >= atk.RecoilUntil and f.Caps.SwordArm > 0.05
 	local s = atk.Stroke
@@ -400,7 +432,7 @@ function SwordController.OnTransition(f, from, to)
 	end
 	if to ~= "Blocking" and f.Block and f.Block.Active then
 		f.Block.Active = false
-		if f.Sword then
+		if f.Sword and f.Sword.ParryZone then
 			f.Sword.ParryZone.CanQuery = false
 		end
 	end

@@ -80,8 +80,20 @@ function SwordBuilder.Build(gripCF)
 	zone.Transparency = 1
 	zone.Massless = true
 	zone:SetAttribute("SwordPart", "Guard")
+	-- solid blade volume (pommel to tip) that collides ONLY with other fighters' colliders, so
+	-- swords physically stop each other where they meet instead of passing through. Slightly
+	-- fatter than the visual blade so fast blades cannot tunnel through each other in one step.
+	local pad = C.ColliderPadding
+	local reachLen = HL + C.GuardThickness + BL
+	local collider = mk(model, "BladeCollider", Vector3.new(C.BladeWidth + pad * 2, reachLen, C.BladeThickness + pad * 2),
+		handleCF * CFrame.new(0, reachLen / 2 - HL / 2, 0), Color3.new(1, 0.4, 0.2))
+	collider.Transparency = 1
+	collider.Massless = true
+	collider.CanCollide = true
+	collider.CollisionGroup = "RR_Blade"
+	collider.CustomPhysicalProperties = PhysicalProperties.new(Config.Physics.SwordDensity, C.ColliderFriction, 0, 1, 1)
 
-	for _, p in ipairs({ guard, blade, edge, tip, zone }) do
+	for _, p in ipairs({ guard, blade, edge, tip, zone, collider }) do
 		weld(handle, p)
 	end
 
@@ -100,6 +112,7 @@ function SwordBuilder.Build(gripCF)
 		Handle = handle,
 		Blade = blade,
 		ParryZone = zone,
+		Collider = collider,
 		GripAtt = gripAtt,
 		OffGripAtt = offGrip,
 		TipLocal = Vector3.new(0, BL / 2, 0),

@@ -15,7 +15,7 @@ local Config = require(Shared.Config)
 local Anatomy = require(Shared.Anatomy)
 local StateDefs = require(Shared.StateDefs)
 local Util = require(script.Parent.Util)
-local AnatomyService = require(script.Parent.AnatomyService)
+local Runtime = require(script.Parent.Runtime)
 local BodyShape = require(script.Parent.BodyShape)
 
 local MotorController = {}
@@ -369,7 +369,7 @@ function MotorController.Apply(f, dt, inp)
 		if not j.Severed then
 			local cls = j.Def.DriveClass and D.Joint[j.Def.DriveClass]
 			if cls then
-				local segF = AnatomyService.SegmentFactor(f, Anatomy.PartByName[j.ChildName].Segment)
+				local segF = f.SegFactor[Anatomy.PartByName[j.ChildName].Segment] or 0
 				local t = (ARM_CLASS[j.Def.DriveClass] and armTone or bodyTone) * (0.25 + 0.75 * segF)
 				if name == "RightWrist" and f.Sword then
 					t = 0 -- the sword drive owns the sword hand's orientation
@@ -435,8 +435,10 @@ function MotorController.Apply(f, dt, inp)
 		local k = 0
 		if f.Sword and f.SwordTargetCF then
 			k = armTone * caps.SwordArm * caps.Grip
-			if os.clock() < f.Attack.RecoilUntil then
+			if Runtime.now() < f.Attack.RecoilUntil then
 				k *= Config.Combat.RecoilHandScale
+			elseif st == "Blocking" then
+				k *= D.BlockHandMult -- blades now collide: a braced guard must hold against a swing
 			end
 			setCF(f, Dr.SwordTarget, "CFrame", f.SwordTargetCF, 0.004, rad(0.3))
 		end
