@@ -7,7 +7,11 @@
 	The engine compares this prediction with the server's authoritative state and, on a mismatch
 	(a hit, a block, a stagger: things only the server decides), rolls back and resimulates.
 	SimState keeps the controllers' Lua-side state in attributes so it rolls back too.
-	Other fighters are not predicted (their inputs are unknown here); they show the server's state.
+	Other fighters are not predicted (their inputs are unknown here); they show the server's state,
+	which is slightly in the past. Their blade colliders are switched off in this client's
+	simulation: colliding the predicted sword with a stale copy of theirs would predict a clash at
+	the wrong place and then be corrected again. Clashes and blocks are decided by the server and
+	arrive as one correction instead.
 ]]
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -93,10 +97,16 @@ function Prediction.Init(ctx)
 		end
 	end)
 
-	-- other fighters are shown as the server has them, never predicted
+	-- other fighters are shown as the server has them, never predicted, and their swords do not
+	-- collide with the predicted one locally
 	local function consider(inst)
 		if inst:IsA("Model") and inst:GetAttribute("RR_Fighter") == true and inst ~= state.Model then
 			setPrediction(inst, Enum.PredictionMode.Off)
+			local katana = inst:FindFirstChild("Katana")
+			local collider = katana and katana:FindFirstChild("BladeCollider")
+			if collider then
+				collider.CanCollide = false
+			end
 		end
 	end
 	workspace.ChildAdded:Connect(consider)

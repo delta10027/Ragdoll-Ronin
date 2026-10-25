@@ -94,6 +94,21 @@ function Util.slerpUnit(a, b, t)
 	return CFrame.fromAxisAngle(axis.Unit, angle * t):VectorToWorldSpace(a)
 end
 
+-- Rotate a toward b about unit axis n by fraction t (both taken perpendicular to n). Opposite
+-- vectors always roll the same way (positive about n) so the result is continuous and repeatable.
+function Util.rollToward(a, b, n, t)
+	local pa = Util.perpendicular(a, n, nil)
+	local pb = Util.perpendicular(b, n, nil)
+	if not pa or not pb then
+		return b
+	end
+	local angle = math.atan2(pa:Cross(pb):Dot(n), pa:Dot(pb))
+	if angle < -math.pi + 1e-3 then
+		angle = math.pi
+	end
+	return CFrame.fromAxisAngle(n, angle * t):VectorToWorldSpace(pa)
+end
+
 -- Remove the component of v along unit axis n and normalise; fallback if degenerate
 function Util.perpendicular(v, n, fallback)
 	local p = v - n * v:Dot(n)

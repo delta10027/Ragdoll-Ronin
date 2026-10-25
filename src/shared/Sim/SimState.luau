@@ -12,7 +12,9 @@
 	          previous step, or the server's state after a rollback), runs the same step, Store(f)
 
 	Numbers are stored as doubles (Vector3 attributes are single precision, which would make the
-	client compute slightly different poses than the server and mispredict every step).
+	client compute slightly different poses than the server and mispredict every step), rounded to
+	QUANTUM, and the rounded value is what both sides continue from: the client may compute the
+	last digits of a sin/acos differently from the server, and rounding absorbs that.
 	Injury-derived capabilities and segment strengths are server-only inputs; the client just reads
 	them. Store() skips unchanged values; OnRollback() forgets what was written so nothing is skipped
 	after the engine restores older values.
@@ -26,29 +28,21 @@ local Input = require(script.Parent.Input)
 local SimState = {}
 
 local LT, UT = "LowerTorso", "UpperTorso"
+local QUANTUM = 1e-6
 local FIELDS = {} -- { Part, Name, Get(f), Set(f, v) }
+local VECS = {} -- { Part, Name, Get(f), Set(f, v) }: stored as three number attributes
 
 local function field(part, name, get, set)
 	table.insert(FIELDS, { Part = part, Name = "S_" .. name, Get = get, Set = set })
 end
 
 local function vecField(part, name, get, set)
-	field(part, name .. "X", function(f)
-		local v = get(f)
-		return v and v.X
-	end, function() end)
-	field(part, name .. "Y", function(f)
-		local v = get(f)
-		return v and v.Y
-	end, function() end)
-	field(part, name .. "Z", function(f)
-		local v = get(f)
-		return v and v.Z
-	end, function(f, z, part0)
-		-- the Z setter runs last and assembles the vector from all three attributes
-		local x, y = part0:GetAttribute("S_" .. name .. "X"), part0:GetAttribute("S_" .. name .. "Y")
-		set(f, (x and y and z) and Vector3.new(x, y, z) or nil)
-	end)
+	local n = "S_" .. name
+	table.insert(VECS, { Part = part, X = n .. "X", Y = n .. "Y", Z = n .. "Z", Get = get, Set = set })
+end
+
+local function q(x)
+	return math.round(x / QUANTUM) * QUANTUM
 end
 
 -- state machine / balance (pelvis)
@@ -77,7 +71,6 @@ field(UT, "AimVU", function(f) return f.Aim.VU end, function(f, v) f.Aim.VU = v 
 field(UT, "AimVV", function(f) return f.Aim.VV end, function(f, v) f.Aim.VV = v end)
 field(UT, "AimGuard", function(f) return f.Aim.Guard end, function(f, v) f.Aim.Guard = v end)
 field(UT, "AimReady", function(f) return f.Aim.Ready end, function(f, v) f.Aim.Ready = v end)
-field(UT, "GuardFlip", function(f) return f.Aim.GuardFlip end, function(f, v) f.Aim.GuardFlip = v == true end)
 vecField(UT, "AimEdge", function(f) return f.Aim.Edge end, function(f, v) f.Aim.Edge = v or Vector3.new(0, -1, 0) end)
 field(UT, "BlockActive", function(f) return f.Block.Active end, function(f, v) f.Block.Active = v == true end)
 field(UT, "BlockStart", function(f) return f.Block.StartTime end, function(f, v) f.Block.StartTime = v or 0 end)
@@ -109,6 +102,14 @@ end
 
 local NIL = {} -- remembers "attribute cleared" in SimWritten
 
+local function write(part, written, name, v)
+	local key = if v == nil then NIL else v
+	if written[name] ~= key then
+		part:SetAttribute(name, v)
+		written[name] = key
+	end
+end
+
 function SimState.Store(f)
 	local written = f.SimWritten
 	if not written then
@@ -119,11 +120,28 @@ function SimState.Store(f)
 		local part = f.Parts[fd.Part]
 		if part then
 			local v = fd.Get(f)
-			local key = if v == nil then NIL else v
-			if written[fd.Name] ~= key then
-				part:SetAttribute(fd.Name, v)
-				written[fd.Name] = key
+			if type(v) == "number" then
+				local r = q(v)
+				if r ~= v then
+					v = r
+					fd.Set(f, v) -- continue from exactly what was published
+				end
 			end
+			write(part, written, fd.Name, v)
+		end
+	end
+	for _, vd in ipairs(VECS) do
+		local part = f.Parts[vd.Part]
+		if part then
+			local v = vd.Get(f)
+			local x, y, z
+			if v then
+				x, y, z = q(v.X), q(v.Y), q(v.Z)
+				vd.Set(f, Vector3.new(x, y, z))
+			end
+			write(part, written, vd.X, x)
+			write(part, written, vd.Y, y)
+			write(part, written, vd.Z, z)
 		end
 	end
 end
@@ -141,7 +159,15 @@ function SimState.Load(f)
 		local part = fd.Part == LT and lt or ut
 		local v = part:GetAttribute(fd.Name)
 		written[fd.Name] = if v == nil then NIL else v
-		fd.Set(f, v, part)
+		fd.Set(f, v)
+	end
+	for _, vd in ipairs(VECS) do
+		local part = vd.Part == LT and lt or ut
+		local x, y, z = part:GetAttribute(vd.X), part:GetAttribute(vd.Y), part:GetAttribute(vd.Z)
+		written[vd.X] = if x == nil then NIL else x
+		written[vd.Y] = if y == nil then NIL else y
+		written[vd.Z] = if z == nil then NIL else z
+		vd.Set(f, (x and y and z) and Vector3.new(x, y, z) or nil)
 	end
 	return true
 end

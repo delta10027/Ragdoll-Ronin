@@ -74,7 +74,13 @@ local CUT_POINT = Config.Sword.HandleLength * 0.25 + Config.Sword.BladeLength * 
 
 -- Key poses are authored unscaled in Config; angle 0 = cursor straight up, clockwise (u right)
 local function scaledKey(k)
-	return { Pos = k.Grip * S, Dir = k.Blade.Unit }
+	local key = { Pos = k.Grip * S, Dir = k.Blade.Unit }
+	if k.Edge then
+		-- full blade orientation (X = edge, Y = blade), so guards blend as one rotation
+		local e = Util.perpendicular(k.Edge, key.Dir, Vector3.xAxis)
+		key.Rot = CFrame.fromMatrix(Vector3.zero, e, key.Dir, e:Cross(key.Dir))
+	end
+	return key
 end
 local GUARD_KEYS = {}
 for i, k in ipairs(A.GuardKeys) do
@@ -159,14 +165,14 @@ local function guardPose(u, v)
 	local i = math.floor(a)
 	local t = Util.smoothstep(a - i)
 	local k0, k1 = GUARD_KEYS[i % n + 1], GUARD_KEYS[(i + 1) % n + 1]
+	-- blade direction and edge blend together as one rotation: blending them separately lets the
+	-- edge pass through zero (and snap the blade over) when the blade turns a lot between keys
 	local pos = k0.Pos:Lerp(k1.Pos, t)
-	local dir = Util.slerpUnit(k0.Dir, k1.Dir, t)
+	local rot = k0.Rot:Lerp(k1.Rot, t)
 	local w = Util.smoothstep((r - A.GuardRimStart) / (A.GuardRimFull - A.GuardRimStart))
 	pos = GUARD_CENTER.Pos:Lerp(pos, w)
-	dir = Util.slerpUnit(GUARD_CENTER.Dir, dir, w)
-	-- the edge faces the threat (its roll is then chosen for reach in UpdateAim)
-	local edge = Vector3.new(ru, rv, -0.2)
-	return pos, dir, edge
+	rot = GUARD_CENTER.Rot:Lerp(rot, w)
+	return pos, rot.UpVector, rot.RightVector
 end
 
 local function clampReach(pos)
@@ -280,32 +286,20 @@ function SwordController.UpdateAim(f, dt, inp)
 	if mode == "Attack" then
 		wantEdge = spd > A.EdgeMinSpeed and cutDirection(aim.U, aim.V, aim.VU, aim.VV, aim.Edge) or aim.Edge
 		if windup > 0 then
-			-- while drawn back the edge already faces the coming cut (down through the centre of
-			-- the disk; the spine leads the backswing), so the cut starts edge-first instead of
-			-- turning the blade mid-swing
+			-- while drawn back the edge already faces the coming cut (back through the centre of
+			-- the disk; the spine leads the backswing), so the cut starts edge-first. Rolled about
+			-- the blade axis: the two directions are often opposite, and blending opposite
+			-- vectors passes through zero and snaps the blade over.
 			local cut = cutDirection(aim.U, aim.V, -aim.U, -aim.V, wantEdge)
-			wantEdge = Util.unit(wantEdge:Lerp(cut, Util.smoothstep(windup * 2)), cut)
+			wantEdge = Util.rollToward(wantEdge, cut, dir, Util.smoothstep(windup * 2))
 		end
 	elseif mode == "Ready" then
 		wantEdge = DEFAULT_EDGE
 	else
 		wantEdge = aim.Edge
 	end
-	-- Guard: the edge's facing does not matter for a block, so choose the roll the sword arm can
-	-- actually reach (the forearm runs opposite the edge in the grip): edge pointing away from
-	-- the shoulder. Hysteresis prevents flip-flopping.
-	if g > 0.5 then
-		local toShoulder = Util.unit(SHOULDER_R - pos, Vector3.zAxis)
-		local ge = Util.perpendicular(gedge.Unit, dir, gedge.Unit)
-		local keep = aim.GuardFlip and -ge or ge
-		local other = -keep
-		if (-other):Dot(toShoulder) > (-keep):Dot(toShoulder) + 0.3 then
-			aim.GuardFlip = not aim.GuardFlip
-		end
-		gedge = aim.GuardFlip and -ge or ge
-	else
-		aim.GuardFlip = false
-	end
+	-- (guard edges come from the guard keys: a block does not care which way the edge faces, so each
+	-- key uses the roll the arms reach most comfortably and the guard never spins the sword)
 	wantEdge = Util.unit(wantEdge:Lerp(gedge.Unit, g), wantEdge)
 	wantEdge = Util.unit(wantEdge:Lerp(DEFAULT_EDGE, ready), wantEdge)
 
