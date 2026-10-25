@@ -437,6 +437,8 @@ function MotorController.Apply(f, dt, inp)
 			k = armTone * caps.SwordArm * caps.Grip
 			if os.clock() < f.Attack.RecoilUntil then
 				k *= Config.Combat.RecoilHandScale
+			elseif st == "Blocking" then
+				k *= D.BlockHandMult -- blades now collide: a braced guard must hold against a swing
 			end
 			setCF(f, Dr.SwordTarget, "CFrame", f.SwordTargetCF, 0.004, rad(0.3))
 		end

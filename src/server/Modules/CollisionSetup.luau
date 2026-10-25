@@ -3,8 +3,9 @@
 	  RR_Core   torso/pelvis/neck/head. Collide with world and with OTHER fighters' cores (bodies shove).
 	            Own core pairs are excluded with NoCollisionConstraints.
 	  RR_Limb   arms/legs. Collide with world only: no self-collision, no limb tangling between fighters.
-	  RR_Sword  blades never physically collide (contacts are resolved by swept queries instead,
-	            which is far more stable than blade-on-blade rigid body contact).
+	  RR_Sword  visual sword parts never physically collide (strikes are resolved by swept queries).
+	  RR_Blade  one invisible collider per sword: collides only with other RR_Blade colliders, so
+	            swords physically block each other (no world, body or debris contact).
 	  RR_Debris severed limbs, dropped swords, corpses: world + other debris only.
 	  RR_HitQuery    raycast group for blade sweeps: sees Core, Limb, Sword only (ignores world/debris).
 	  RR_GroundQuery raycast group for ground probes and camera: sees the world only.
@@ -17,6 +18,7 @@ local G = {
 	Core = "RR_Core",
 	Limb = "RR_Limb",
 	Sword = "RR_Sword",
+	Blade = "RR_Blade",
 	Debris = "RR_Debris",
 	HitQuery = "RR_HitQuery",
 	GroundQuery = "RR_GroundQuery",
@@ -54,6 +56,15 @@ function CollisionSetup.Init()
 	set(G.Sword, G.Debris, false)
 	set(G.Sword, G.HitQuery, true)
 	set(G.Sword, G.GroundQuery, false)
+	-- Blade colliders: other blades only
+	set(G.Blade, D, false)
+	set(G.Blade, G.Blade, true)
+	set(G.Blade, G.Core, false)
+	set(G.Blade, G.Limb, false)
+	set(G.Blade, G.Sword, false)
+	set(G.Blade, G.Debris, false)
+	set(G.Blade, G.HitQuery, false)
+	set(G.Blade, G.GroundQuery, false)
 	-- Debris
 	set(G.Debris, D, true)
 	set(G.Debris, G.Debris, true)

@@ -78,6 +78,7 @@ Config.Drives = {
 		Knee = { Torque = 2200, Speed = 14 },
 	},
 	HandForce = 3500,
+	BlockHandMult = 1.6, -- sword hand drive strength while blocking, so a held guard stops a swing
 	HandResponsiveness = 60,
 	HandMaxVelocity = 46, -- physical cap on hand speed (server-side swing speed limit)
 	HandTorque = 1800,
@@ -101,6 +102,8 @@ Config.Sword = {
 	GuardDiameter = 0.55 * S,
 	GuardThickness = 0.08 * S,
 	ParryZoneWidth = 0.95 * S, -- guard interception tolerance volume around the blade
+	ColliderPadding = 0.1 * S, -- the solid blade collider is this much fatter than the visual blade on each side
+	ColliderFriction = 0.25, -- low, so a blocked blade can slide off along the guard
 	SampleCount = 7, -- swept sample points along the blade
 	WeaponFactor = 1.0,
 }
@@ -125,12 +128,8 @@ Config.Aim = {
 	ThrustDepth = 0.55,
 	BladeOutward = 1.25,
 	BladeLift = 0.2,
-	CrossBodyDepth = 0.45, -- extra forward reach when the sword hand crosses to the left
-	GuardRadius = 0.75,
-	GuardBaseY = 0.25,
-	GuardDepth = 1.25,
-	GuardBladeFraction = 0.35, -- how far up the blade the guard meets the threatened line
-	GuardHandDepth = 1.05, -- the guard never pulls the hands closer to the chest than this
+	CrossBodyDepth = 0.3, -- extra forward reach when the sword hand crosses to the left
+	CrossBodySpread = 0.55, -- the sword hand travels less far to the left than to the right (reach)
 	-- Key poses: grip position (unscaled, upper-torso space: +X right, +Y up, -Z forward) and blade
 	-- direction. Idle: two-handed, hands low in front of the hips, blade angled up and forward.
 	ReadyGrip = Vector3.new(0.08, -0.75, -1.45),
@@ -145,13 +144,40 @@ Config.Aim = {
 	WindupBlade = Vector3.new(0.05, 0.4, 0.92),
 	WindupSpreadX = 0.4, -- grip shift per unit of cursor u while wound up (diagonal windups)
 	WindupBladeOutward = 0.3,
-	-- High guard (M2 with the cursor up): blade held flat across in front of the top of the head,
-	-- tip to the right, hands up at the front-left of the forehead, to stop vertical cuts. (The
-	-- tip must go right: the left hand holds the pommel end, so it has to be the hand further left.)
-	HighGuardStart = 0.55, -- cursor direction (vertical component) where the high-guard layout begins
-	HighGuardDrop = 1.3, -- how far the guard sits below HighGuardGrip with the cursor near the centre
-	HighGuardGrip = Vector3.new(-0.15, 2.15, -0.9),
-	HighGuardBlade = Vector3.new(0.98, 0.1, -0.15),
+	-- Diagonal cuts: near a diagonal of the disk the attack pose blends toward these keys. The
+	-- upper ones raise the sword over that shoulder (Windup = edge pre-aimed at the coming cut), the
+	-- lower ones are the finish at the opposite hip, so dragging corner to corner is a full
+	-- shoulder-to-hip diagonal. Angle: degrees clockwise from straight up.
+	DiagonalWidth = 40, -- degrees either side of a diagonal over which its key blends in
+	DiagonalRimStart = 0.3, -- cursor radius where the diagonal keys start to take over
+	-- resting out at the rim (above the lower diagonals) the edge pre-aims at a cut back through the
+	-- centre, so horizontal and diagonal cuts start edge-first
+	RimPrepStart = 0.6,
+	DiagonalKeys = {
+		{ Angle = 45, Windup = true, Grip = Vector3.new(0.8, 1.5, -0.6), Blade = Vector3.new(0.3, 0.55, 0.78) }, -- over right shoulder
+		{ Angle = 315, Windup = true, Grip = Vector3.new(-0.55, 1.45, -0.8), Blade = Vector3.new(-0.3, 0.55, 0.78) }, -- over left shoulder
+		{ Angle = 225, Grip = Vector3.new(-0.15, -0.55, -1.1), Blade = Vector3.new(-0.45, -0.75, -0.48) }, -- finish at left hip
+		{ Angle = 135, Grip = Vector3.new(0.75, -0.75, -1.05), Blade = Vector3.new(0.45, -0.75, -0.5) }, -- finish at right hip
+	},
+	-- Guard (M2): one key per 45 degrees clockwise from straight up, each held OUT beyond the body
+	-- on its side so a real swing meets the blade before it reaches the body. Near the disk centre
+	-- the guard blends into GuardCenter (flat across in front of the chin).
+	-- Up: flat across above the head, tip to the right (the left hand holds the pommel end, so it
+	-- has to be the hand further left). Right: vertical outside the right shoulder, one-handed (the
+	-- left hand cannot reach). Left: tip angled up and out past the left shoulder.
+	GuardRimStart = 0.3,
+	GuardRimFull = 0.85,
+	GuardCenter = { Grip = Vector3.new(-0.15, 1.15, -1.15), Blade = Vector3.new(0.98, 0.1, -0.15) },
+	GuardKeys = {
+		{ Grip = Vector3.new(-0.15, 2.15, -0.9), Blade = Vector3.new(0.98, 0.1, -0.15) }, -- up
+		{ Grip = Vector3.new(1.45, 0.95, -1.1), Blade = Vector3.new(-0.62, 0.76, -0.18) }, -- up-right (one-handed)
+		{ Grip = Vector3.new(1.5, -0.35, -1.0), Blade = Vector3.new(0.1, 0.98, -0.15) }, -- right (one-handed)
+		{ Grip = Vector3.new(0.75, -0.45, -1.25), Blade = Vector3.new(0.45, -0.85, -0.25) }, -- down-right
+		{ Grip = Vector3.new(0.15, -0.7, -1.4), Blade = Vector3.new(-0.1, -0.97, -0.22) }, -- down
+		{ Grip = Vector3.new(-0.2, -0.5, -1.25), Blade = Vector3.new(-0.5, -0.82, -0.25) }, -- down-left
+		{ Grip = Vector3.new(-0.55, -0.25, -1.3), Blade = Vector3.new(-0.78, 0.6, -0.15) }, -- left
+		{ Grip = Vector3.new(-0.45, 0.6, -1.35), Blade = Vector3.new(-0.62, 0.76, -0.2) }, -- up-left
+	},
 }
 
 Config.Combat = {
