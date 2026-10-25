@@ -58,6 +58,19 @@ local GRIP_LOCAL_INV = GRIP_LOCAL:Inverse()
 local WRIST_IN_HAND = Vector3.new(0, 0.225 * S, 0)
 
 ------------------------------------------------------------------ thresholded writes
+-- Under server authority every value is written exactly: the skip-small-changes cache depends on
+-- write history, which differs between the server and a client that just rolled back, so the
+-- engine would see slightly different drive targets and keep mispredicting.
+local EXACT = Runtime.ServerAuthority
+-- quantization of the few drive values computed straight from physics state (which differs by
+-- tiny amounts between client prediction and server), so both sides usually write the same value
+local SUPPORT_ACCEL_STEP = 0.5 -- studs/s^2
+local GAIT_ANGLE_STEP = math.rad(3)
+
+local function quantize(x, step)
+	return math.round(x / step) * step
+end
+
 local function cacheOf(f, inst)
 	local c = f.DriveCache[inst]
 	if not c then
@@ -68,6 +81,10 @@ local function cacheOf(f, inst)
 end
 
 local function setNum(f, inst, prop, value, eps)
+	if EXACT then
+		inst[prop] = value
+		return
+	end
 	local c = cacheOf(f, inst)
 	local old = c[prop]
 	if old == nil or math.abs(old - value) > eps or (value == 0 and old ~= 0) then
@@ -77,6 +94,10 @@ local function setNum(f, inst, prop, value, eps)
 end
 
 local function setCF(f, inst, prop, cf, posEps, angEps)
+	if EXACT then
+		inst[prop] = cf
+		return
+	end
 	local c = cacheOf(f, inst)
 	local old = c[prop]
 	if old == nil or (old.Position - cf.Position).Magnitude > posEps or Util.rotationDelta(old, cf) > angEps then
@@ -86,6 +107,10 @@ local function setCF(f, inst, prop, cf, posEps, angEps)
 end
 
 local function setVec(f, inst, prop, v, eps)
+	if EXACT then
+		inst[prop] = v
+		return
+	end
 	local c = cacheOf(f, inst)
 	local old = c[prop]
 	if old == nil or (old - v).Magnitude > eps then
@@ -97,7 +122,8 @@ end
 ------------------------------------------------------------------ IK
 -- Elbow swing candidates (degrees about the shoulder->target line), tried when the preferred
 -- elbow would put the arm inside the torso or head. Ordered so the closest clear one wins.
-local POLE_STEPS = { 0, 20, -20, 40, -40, 60, -60, 85, -85, 110, -110, 140, -140, 180 }
+local POLE_STEPS = { 0, 20, -20, 40, -40, 60, -60, 80, -80, 100, -100, 120, -120, 140, -140, 160, -160, 180 }
+local LIMIT_COST = 0.6 -- cost per radian past a joint limit (comparable to ~0.1 stud of body overlap per 10 degrees)
 local ARM_RADIUS = 0.21 * S
 
 local function armPenetration(shoulder, elbow, target)
@@ -111,11 +137,59 @@ local function armPenetration(shoulder, elbow, target)
 	return pen
 end
 
+-- Joint limits the IK must respect (Anatomy): an IK pose beyond them leaves the joint drive pushing
+-- into the ball-socket limit every frame, which jitters - and under server authority makes client
+-- and server physics diverge. A small margin keeps the solution off the hard stop.
+local LIMIT_MARGIN = rad(8)
+local SHOULDER_TWIST = rad(Anatomy.JointByName.RightShoulder.Twist) - LIMIT_MARGIN
+local WRIST_CONE = rad(Anatomy.JointByName.RightWrist.Cone) - LIMIT_MARGIN
+local WRIST_TWIST = rad(Anatomy.JointByName.RightWrist.Twist) - LIMIT_MARGIN
+local LIMB_AXIS = Vector3.new(0, -1, 0)
+
+-- Swing (cone angle) and twist of a rotation relative to the rest frame (limb along -Y, secondary
+-- axis +X), decomposed the way a BallSocketConstraint measures them.
+local function swingTwist(r)
+	local b = r:VectorToWorldSpace(LIMB_AXIS)
+	local swing = math.acos(math.clamp(LIMB_AXIS:Dot(b), -1, 1))
+	local axis = LIMB_AXIS:Cross(b)
+	if axis.Magnitude < 1e-6 then
+		axis = Vector3.xAxis
+	end
+	local twistOnly = CFrame.fromAxisAngle(axis.Unit, swing):Inverse() * r
+	local x = twistOnly:VectorToWorldSpace(Vector3.xAxis)
+	return swing, math.atan2(x.Z, x.X)
+end
+
+-- Upper-arm rotation for an elbow swung toward `pole`
+local function armFrame(shoulder, n, cosA, sinA, pole, target)
+	local u = n * cosA + pole * sinA -- upper arm direction
+	local elbow = shoulder + u * L1
+	local fore = Util.unit(target - elbow, n)
+	local Y = -u
+	local Z = -Util.perpendicular(fore, u, -pole) -- forearm deviates toward local -Z
+	local X = Y:Cross(Z)
+	return CFrame.fromMatrix(Vector3.zero, X, Y, Z), elbow
+end
+
+-- How far (radians) a candidate arm pose goes past the shoulder and wrist limits
+local function limitExcess(rot, flex, handRot)
+	local _, twist = swingTwist(rot)
+	local over = math.max(0, math.abs(twist) - SHOULDER_TWIST)
+	if handRot then
+		local wrist = (rot * CFrame.fromAxisAngle(Vector3.xAxis, flex)):Inverse() * handRot
+		local cone, wtwist = swingTwist(wrist)
+		over += math.max(0, cone - WRIST_CONE) + math.max(0, math.abs(wtwist) - WRIST_TWIST)
+	end
+	return over
+end
+
 -- Two-bone arm IK in upper-torso space. Returns upper-arm rotation (rest frame: limb along -Y,
 -- elbow flexion about +X toward -Z) and elbow flex angle.
 -- avoid (optional table, kept per fighter and side): swing the elbow around the shoulder->target
--- line until the arm clears the body, preferring the requested pole and the previous choice.
-local function solveArm(side, target, poleDir, l2, avoid)
+-- line to the closest position where the arm clears the body and stays within the shoulder (and,
+-- given the hand's rotation handRot, wrist) limits, preferring the requested pole and the
+-- previous choice.
+local function solveArm(side, target, poleDir, l2, avoid, handRot)
 	l2 = l2 or L2
 	local shoulder = SHOULDER[side]
 	local toT = target - shoulder
@@ -127,32 +201,27 @@ local function solveArm(side, target, poleDir, l2, avoid)
 	local fallbackPole = Util.perpendicular(POLE[side], n, Util.perpendicular(Vector3.new(0, 0, 1), n, Vector3.xAxis))
 	local pole = poleDir and Util.perpendicular(poleDir, n, fallbackPole) or fallbackPole
 	local sinA = math.sqrt(1 - cosA * cosA)
-	if avoid then
-		local tgt = shoulder + n * d
-		local bestPole, bestCost, bestStep = pole, math.huge, 0
-		local prev = avoid.Step or 0
-		for _, step in ipairs(POLE_STEPS) do
-			local p = step == 0 and pole or CFrame.fromAxisAngle(n, rad(step)):VectorToWorldSpace(pole)
-			local elbow = shoulder + (n * cosA + p * sinA) * L1
-			local pen = armPenetration(shoulder, elbow, tgt)
-			local cost = pen + 0.0008 * math.abs(step) + 0.0004 * math.abs(step - prev)
-			if cost < bestCost then
-				bestPole, bestCost, bestStep = p, cost, step
-			end
-			if pen == 0 and step == 0 and prev == 0 then
-				break -- common case: the natural elbow is already clear
-			end
-		end
-		pole = bestPole
-		avoid.Step = bestStep
+	if not avoid then
+		return (armFrame(shoulder, n, cosA, sinA, pole, target)), flex
 	end
-	local u = n * cosA + pole * sinA -- upper arm direction
-	local elbow = shoulder + u * L1
-	local fore = Util.unit(target - elbow, n)
-	local Y = -u
-	local Z = -Util.perpendicular(fore, u, -pole) -- forearm deviates toward local -Z
-	local X = Y:Cross(Z)
-	return CFrame.fromMatrix(Vector3.zero, X, Y, Z), flex
+	local tgt = shoulder + n * d
+	local bestRot, bestCost, bestStep = nil, math.huge, 0
+	local prev = avoid.Step or 0
+	for _, step in ipairs(POLE_STEPS) do
+		local p = step == 0 and pole or CFrame.fromAxisAngle(n, rad(step)):VectorToWorldSpace(pole)
+		local rot, elbow = armFrame(shoulder, n, cosA, sinA, p, target)
+		local pen = armPenetration(shoulder, elbow, tgt)
+		local over = limitExcess(rot, flex, handRot)
+		local cost = pen + over * LIMIT_COST + 0.0003 * math.abs(step) + 0.0001 * math.abs(step - prev)
+		if cost < bestCost then
+			bestRot, bestCost, bestStep = rot, cost, step
+		end
+		if pen == 0 and over == 0 and step == 0 and prev == 0 then
+			break -- common case: the natural elbow is already fine
+		end
+	end
+	avoid.Step = bestStep
+	return bestRot, flex
 end
 
 ------------------------------------------------------------------ poses
@@ -175,6 +244,10 @@ local function standLegs(f, dt, pose)
 	end
 	local lv = pelvis.CFrame:VectorToObjectSpace(vel)
 	local m = Util.unit(Vector3.new(lv.X, 0, lv.Z), Vector3.new(0, 0, -1))
+	if EXACT then
+		local a = quantize(math.atan2(m.X, -m.Z), GAIT_ANGLE_STEP)
+		m = Vector3.new(math.sin(a), 0, -math.cos(a))
+	end
 	local axis = Vector3.new(-m.Z, 0, m.X) -- rotating the leg about this swings it toward m
 	local fwd = -m.Z
 	for _, side in ipairs({ "Left", "Right" }) do
@@ -260,7 +333,7 @@ local function armPose(f, pose)
 		local handCF = f.SwordTargetCF * GRIP_LOCAL_INV
 		local wrist = handCF:PointToWorldSpace(WRIST_IN_HAND)
 		local idealElbow = wrist + handCF.UpVector * L_FOREARM
-		local rot, flex = solveArm("Right", wrist, idealElbow - SHOULDER.Right, L_FOREARM, f.ArmAvoid.Right)
+		local rot, flex = solveArm("Right", wrist, idealElbow - SHOULDER.Right, L_FOREARM, f.ArmAvoid.Right, handCF.Rotation)
 		pose.RightShoulder = rot
 		pose.RightElbow = flex
 	elseif not pose.RightShoulder then
@@ -363,6 +436,12 @@ function MotorController.Apply(f, dt, inp)
 		end
 	end
 
+	-- commanded locomotion, before the pose: the gait cycle follows it (this step's, not last step's)
+	local moveDir = StateDefs.Upright[st] and inp.Move or Vector3.zero
+	local speed = M.WalkSpeed * tone.Move * caps.Move * (caps.Kneeling and M.KneelSpeedMult or 1)
+	local vel = moveDir * speed
+	f.CommandedVelocity = vel
+
 	-- 1. joints
 	local pose = MotorController.ComputePose(f, dt)
 	for name, j in pairs(f.Joints) do
@@ -407,10 +486,6 @@ function MotorController.Apply(f, dt, inp)
 	setNum(f, Dr.Upright, "MaxTorque", D.PelvisTorquePerMass * f.TotalMass * uprightTone * caps.Stability, 5)
 
 	-- 3. locomotion
-	local moveDir = StateDefs.Upright[st] and inp.Move or Vector3.zero
-	local speed = M.WalkSpeed * tone.Move * caps.Move * (caps.Kneeling and M.KneelSpeedMult or 1)
-	local vel = moveDir * speed
-	f.CommandedVelocity = vel
 	setVec(f, Dr.Move, "PlaneVelocity", Vector2.new(vel.X, vel.Z), 0.05)
 	local authority = (tone.Support > 0 and f.Grounded) and r or 0
 	setNum(f, Dr.Move, "MaxForce", f.TotalMass * (tone.Accel or M.Acceleration) * authority, 1)
@@ -426,6 +501,9 @@ function MotorController.Apply(f, dt, inp)
 		local vy = pelvis.AssemblyLinearVelocity.Y
 		local acc = g + M.SupportStiffness * (target - f.Ground.Height) - M.SupportDamping * vy
 		acc = math.clamp(acc, 0, g * M.MaxSupportAccel)
+		if EXACT then
+			acc = quantize(acc, SUPPORT_ACCEL_STEP)
+		end
 		force = f.TotalMass * acc * tone.Support * r
 	end
 	setVec(f, Dr.Support, "Force", Vector3.new(0, force, 0), f.TotalMass * 2)

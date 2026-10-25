@@ -68,10 +68,12 @@ J({ Name = "NeckBase", Parent = "UpperTorso", Child = "Neck", Pivot = Vector3.ne
 J({ Name = "NeckHead", Parent = "Neck", Child = "Head", Pivot = Vector3.new(0, 2.45, 0), Type = "Ball", Axis = "Up", Cone = 35, Twist = 60, DriveClass = "Head" })
 
 -- Wrist twist is wide because the rig has no separate forearm roll: it stands in for pronation/supination.
+-- Shoulder twist is wide for the same reason (no collarbone or forearm roll either): sword poses need
+-- about +-100 degrees of upper-arm rotation, and the arm IK keeps every pose inside these limits.
 for _, side in ipairs({ "Right", "Left" }) do
 	local sx = side == "Right" and 1 or -1
 	local ax, lx = 1.2 * sx, 0.42 * sx
-	J({ Name = side .. "Shoulder", Parent = "UpperTorso", Child = side .. "UpperArmP", Pivot = Vector3.new(ax, 1.7, 0), Type = "Ball", Axis = "Down", Cone = 175, Twist = 80, DriveClass = "Shoulder" })
+	J({ Name = side .. "Shoulder", Parent = "UpperTorso", Child = side .. "UpperArmP", Pivot = Vector3.new(ax, 1.7, 0), Type = "Ball", Axis = "Down", Cone = 175, Twist = 110, DriveClass = "Shoulder" })
 	J({ Name = side .. "UpperArmMid", Parent = side .. "UpperArmP", Child = side .. "UpperArmD", Pivot = Vector3.new(ax, 1.275, 0), Type = "Weld", Severable = true, StumpBleed = 55, Label = "upper arm" })
 	J({ Name = side .. "Elbow", Parent = side .. "UpperArmD", Child = side .. "ForearmP", Pivot = Vector3.new(ax, 0.65, 0), Type = "Hinge", RotSign = 1, FlexMin = -5, FlexMax = 150, DriveClass = "Elbow", Severable = true, StumpBleed = 40, Label = "elbow" })
 	J({ Name = side .. "ForearmMid", Parent = side .. "ForearmP", Child = side .. "ForearmD", Pivot = Vector3.new(ax, 0.075, 0), Type = "Weld", Severable = true, StumpBleed = 30, Label = "forearm" })

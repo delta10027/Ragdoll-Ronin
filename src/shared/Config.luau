@@ -155,7 +155,7 @@ Config.Aim = {
 	RimPrepStart = 0.6,
 	DiagonalKeys = {
 		{ Angle = 45, Windup = true, Grip = Vector3.new(0.8, 1.5, -0.6), Blade = Vector3.new(0.3, 0.55, 0.78) }, -- over right shoulder
-		{ Angle = 315, Windup = true, Grip = Vector3.new(-0.55, 1.45, -0.8), Blade = Vector3.new(-0.3, 0.55, 0.78) }, -- over left shoulder
+		{ Angle = 315, Windup = true, Grip = Vector3.new(-0.35, 1.4, -0.85), Blade = Vector3.new(-0.3, 0.55, 0.78) }, -- over left shoulder
 		{ Angle = 225, Grip = Vector3.new(-0.15, -0.55, -1.1), Blade = Vector3.new(-0.45, -0.75, -0.48) }, -- finish at left hip
 		{ Angle = 135, Grip = Vector3.new(0.75, -0.75, -1.05), Blade = Vector3.new(0.45, -0.75, -0.5) }, -- finish at right hip
 	},
@@ -163,20 +163,21 @@ Config.Aim = {
 	-- on its side so a real swing meets the blade before it reaches the body. Near the disk centre
 	-- the guard blends into GuardCenter (flat across in front of the chin).
 	-- Up: flat across above the head, tip to the right (the left hand holds the pommel end, so it
-	-- has to be the hand further left). Right: vertical outside the right shoulder, one-handed (the
-	-- left hand cannot reach). Left: tip angled up and out past the left shoulder.
+	-- has to be the hand further left). Sides: tip angled up and out past that shoulder. Every key
+	-- keeps both hands on the hilt. Edge: the roll of the blade, fixed per key and chosen for the
+	-- least arm strain, so moving the guard never spins the sword in the hands.
 	GuardRimStart = 0.3,
 	GuardRimFull = 0.85,
-	GuardCenter = { Grip = Vector3.new(-0.15, 1.15, -1.15), Blade = Vector3.new(0.98, 0.1, -0.15) },
+	GuardCenter = { Grip = Vector3.new(-0.15, 1.15, -1.15), Blade = Vector3.new(0.98, 0.1, -0.15), Edge = Vector3.new(-0.13, 0.98, -0.18) },
 	GuardKeys = {
-		{ Grip = Vector3.new(-0.15, 2.15, -0.9), Blade = Vector3.new(0.98, 0.1, -0.15) }, -- up
-		{ Grip = Vector3.new(1.45, 0.95, -1.1), Blade = Vector3.new(-0.62, 0.76, -0.18) }, -- up-right (one-handed)
-		{ Grip = Vector3.new(1.5, -0.35, -1.0), Blade = Vector3.new(0.1, 0.98, -0.15) }, -- right (one-handed)
-		{ Grip = Vector3.new(0.75, -0.45, -1.25), Blade = Vector3.new(0.45, -0.85, -0.25) }, -- down-right
-		{ Grip = Vector3.new(0.15, -0.7, -1.4), Blade = Vector3.new(-0.1, -0.97, -0.22) }, -- down
-		{ Grip = Vector3.new(-0.2, -0.5, -1.25), Blade = Vector3.new(-0.5, -0.82, -0.25) }, -- down-left
-		{ Grip = Vector3.new(-0.55, -0.25, -1.3), Blade = Vector3.new(-0.78, 0.6, -0.15) }, -- left
-		{ Grip = Vector3.new(-0.45, 0.6, -1.35), Blade = Vector3.new(-0.62, 0.76, -0.2) }, -- up-left
+		{ Grip = Vector3.new(-0.15, 2.15, -0.9), Blade = Vector3.new(0.98, 0.1, -0.15), Edge = Vector3.new(-0.13, 0.98, -0.18) }, -- up
+		{ Grip = Vector3.new(0.1, 1.2, -1.2), Blade = Vector3.new(0.9, 0.42, -0.15), Edge = Vector3.new(-0.44, 0.88, -0.16) }, -- up-right
+		{ Grip = Vector3.new(0.45, -0.35, -1.35), Blade = Vector3.new(0.75, 0.65, -0.15), Edge = Vector3.new(-0.64, 0.76, 0.13) }, -- right
+		{ Grip = Vector3.new(0.75, -0.45, -1.25), Blade = Vector3.new(0.45, -0.85, -0.25), Edge = Vector3.new(-0.89, -0.43, -0.15) }, -- down-right
+		{ Grip = Vector3.new(0.15, -0.7, -1.4), Blade = Vector3.new(-0.1, -0.97, -0.22), Edge = Vector3.new(-0.96, 0.15, -0.22) }, -- down
+		{ Grip = Vector3.new(-0.2, -0.5, -1.25), Blade = Vector3.new(-0.5, -0.82, -0.25), Edge = Vector3.new(-0.86, 0.46, 0.21) }, -- down-left
+		{ Grip = Vector3.new(-0.55, -0.25, -1.3), Blade = Vector3.new(-0.78, 0.6, -0.15), Edge = Vector3.new(-0.59, -0.8, -0.13) }, -- left
+		{ Grip = Vector3.new(-0.45, 0.6, -1.35), Blade = Vector3.new(-0.62, 0.76, -0.2), Edge = Vector3.new(-0.78, -0.63, 0.03) }, -- up-left
 	},
 }
 
