@@ -75,6 +75,25 @@ function Util.rotateToward(cur, target, maxAngle)
 	return CFrame.fromAxisAngle(axis.Unit, maxAngle):VectorToWorldSpace(cur)
 end
 
+-- Spherical interpolation between unit vectors a and b (constant angular rate)
+function Util.slerpUnit(a, b, t)
+	if t <= 0 then
+		return a
+	elseif t >= 1 then
+		return b
+	end
+	local angle = math.acos(math.clamp(a:Dot(b), -1, 1))
+	if angle < 1e-4 then
+		return b
+	end
+	local axis = a:Cross(b)
+	if axis.Magnitude < 1e-6 then
+		-- opposite vectors: any perpendicular axis works
+		axis = Util.perpendicular(Vector3.yAxis, a, Vector3.xAxis):Cross(a)
+	end
+	return CFrame.fromAxisAngle(axis.Unit, angle * t):VectorToWorldSpace(a)
+end
+
 -- Remove the component of v along unit axis n and normalise; fallback if degenerate
 function Util.perpendicular(v, n, fallback)
 	local p = v - n * v:Dot(n)

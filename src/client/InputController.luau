@@ -1,5 +1,5 @@
 --[[
-	InputController: samples input and sends INTENT to the server (~30 Hz, unreliable channel).
+	InputController: samples input and sends INTENT to the server (~60 Hz, unreliable channel).
 
 	Mouse mapping (mouse is locked to the screen centre, raw deltas are used, so it works the same
 	in every mouse mode and on any resolution):
@@ -28,6 +28,7 @@ function InputController.Init(ctx)
 		History = {},
 		Seq = 0,
 		LastSend = 0,
+		LastButtons = 0,
 		PressTime = 0,
 	}
 	ctx.Input = s
@@ -98,10 +99,12 @@ function InputController.Update(ctx, dt)
 		table.remove(s.History, 1)
 	end
 
-	if now - s.LastSend >= 1 / Config.Network.ClientSendRate then
+	-- a button press/release goes out immediately instead of waiting for the next send slot
+	local buttons = (s.M1 and 1 or 0) + (s.M2 and 2 or 0)
+	if buttons ~= s.LastButtons or now - s.LastSend >= 1 / Config.Network.ClientSendRate then
+		s.LastButtons = buttons
 		s.LastSend = now
 		s.Seq += 1
-		local buttons = (s.M1 and 1 or 0) + (s.M2 and 2 or 0)
 		ctx.Remotes.CombatInput:FireServer(s.Seq, s.Move.X, s.Move.Z, ctx.Camera.Yaw, s.AimU, s.AimV, buttons)
 	end
 end
