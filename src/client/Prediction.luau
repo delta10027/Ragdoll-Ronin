@@ -150,7 +150,7 @@ end
 -- for the debug overlay
 function Prediction.Status(ctx)
 	if not state.Enabled then
-		return "off (Workspace.AuthorityMode is not Server)"
+		return "off (Config.Network.ServerAuthority is false)"
 	end
 	return string.format("%s, rollbacks/s %d", state.Fighter and "predicting" or "waiting for fighter", state.RollbackRate)
 end

@@ -20,6 +20,9 @@ Config.Debug = {
 }
 
 Config.Network = {
+	-- Must match Workspace.AuthorityMode (true = Server). Game scripts cannot read that property
+	-- (RobloxScriptSecurity), so it is mirrored here; see Shared.Sim.Runtime.
+	ServerAuthority = true,
 	ClientSendRate = 60, -- input packets per second (plus one immediately on every button press/release)
 	BucketCapacity = 30,
 	BucketRefillPerSecond = 100, -- hard cap on accepted input packets

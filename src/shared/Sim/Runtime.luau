@@ -1,7 +1,9 @@
 --[[
 	Runtime: what the shared simulation modules need to know about where they run.
 
-	  ServerAuthority  true when Workspace.AuthorityMode is Server. The controllers then run inside
+	  ServerAuthority  true when Workspace.AuthorityMode is Server. That property is not readable by
+	                   game scripts (RobloxScriptSecurity), so unless a read succeeds this comes
+	                   from Config.Network.ServerAuthority, which must be kept in sync with it. The controllers then run inside
 	                   RunService:BindToSimulation on the server AND on the owning client (client
 	                   prediction with rollback, see SimState); otherwise only on the server.
 	  now()            the clock for every time stored in simulation state (state timers, recoil,
@@ -11,10 +13,16 @@
 ]]
 local Runtime = {}
 
+local Config = require(script.Parent.Parent.Config)
+
 local ok, isServer = pcall(function()
 	return workspace.AuthorityMode == Enum.AuthorityMode.Server
 end)
-Runtime.ServerAuthority = ok and isServer == true
+if ok then
+	Runtime.ServerAuthority = isServer == true
+else
+	Runtime.ServerAuthority = Config.Network.ServerAuthority == true
+end
 
 function Runtime.now()
 	if Runtime.ServerAuthority then
