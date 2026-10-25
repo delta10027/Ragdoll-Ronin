@@ -16,6 +16,7 @@ local Anatomy = require(Shared.Anatomy)
 local StateDefs = require(Shared.StateDefs)
 local Util = require(script.Parent.Util)
 local AnatomyService = require(script.Parent.AnatomyService)
+local BodyShape = require(script.Parent.BodyShape)
 
 local MotorController = {}
 
@@ -94,9 +95,27 @@ local function setVec(f, inst, prop, v, eps)
 end
 
 ------------------------------------------------------------------ IK
+-- Elbow swing candidates (degrees about the shoulder->target line), tried when the preferred
+-- elbow would put the arm inside the torso or head. Ordered so the closest clear one wins.
+local POLE_STEPS = { 0, 20, -20, 40, -40, 60, -60, 85, -85, 110, -110, 140, -140, 180 }
+local ARM_RADIUS = 0.21 * S
+
+local function armPenetration(shoulder, elbow, target)
+	local pen = 0
+	for _, t in ipairs({ 0.45, 0.75, 1 }) do
+		pen += BodyShape.Penetration(shoulder:Lerp(elbow, t), ARM_RADIUS)
+	end
+	for _, t in ipairs({ 0.35, 0.7 }) do
+		pen += BodyShape.Penetration(elbow:Lerp(target, t), ARM_RADIUS)
+	end
+	return pen
+end
+
 -- Two-bone arm IK in upper-torso space. Returns upper-arm rotation (rest frame: limb along -Y,
 -- elbow flexion about +X toward -Z) and elbow flex angle.
-local function solveArm(side, target, poleDir, l2)
+-- avoid (optional table, kept per fighter and side): swing the elbow around the shoulder->target
+-- line until the arm clears the body, preferring the requested pole and the previous choice.
+local function solveArm(side, target, poleDir, l2, avoid)
 	l2 = l2 or L2
 	local shoulder = SHOULDER[side]
 	local toT = target - shoulder
@@ -108,6 +127,25 @@ local function solveArm(side, target, poleDir, l2)
 	local fallbackPole = Util.perpendicular(POLE[side], n, Util.perpendicular(Vector3.new(0, 0, 1), n, Vector3.xAxis))
 	local pole = poleDir and Util.perpendicular(poleDir, n, fallbackPole) or fallbackPole
 	local sinA = math.sqrt(1 - cosA * cosA)
+	if avoid then
+		local tgt = shoulder + n * d
+		local bestPole, bestCost, bestStep = pole, math.huge, 0
+		local prev = avoid.Step or 0
+		for _, step in ipairs(POLE_STEPS) do
+			local p = step == 0 and pole or CFrame.fromAxisAngle(n, rad(step)):VectorToWorldSpace(pole)
+			local elbow = shoulder + (n * cosA + p * sinA) * L1
+			local pen = armPenetration(shoulder, elbow, tgt)
+			local cost = pen + 0.0008 * math.abs(step) + 0.0004 * math.abs(step - prev)
+			if cost < bestCost then
+				bestPole, bestCost, bestStep = p, cost, step
+			end
+			if pen == 0 and step == 0 and prev == 0 then
+				break -- common case: the natural elbow is already clear
+			end
+		end
+		pole = bestPole
+		avoid.Step = bestStep
+	end
 	local u = n * cosA + pole * sinA -- upper arm direction
 	local elbow = shoulder + u * L1
 	local fore = Util.unit(target - elbow, n)
@@ -193,26 +231,43 @@ local function fallingPose(pose)
 	end
 end
 
+-- off-hand grip point on the hilt (upper-torso space)
+local function offHandTarget(f)
+	return (f.SwordTargetCF * CFrame.new(0, -0.55 * Config.Sword.HandleLength, 0)).Position
+end
+
 local function twoHanded(f)
 	return f.Sword ~= nil and f.Drives.OffPos ~= nil and f.Caps.OffArm > 0.2 and StateDefs.Upright[f.State] == true
+		and f.SwordTargetCF ~= nil and not f.OffHandFree
+end
+
+-- The off hand lets go when the pose puts the hilt out of its reach (e.g. a guard low on the
+-- right) instead of straining the arm through the torso; it takes hold again once back in reach.
+local function updateOffHandGrip(f)
+	if not f.SwordTargetCF then
+		return
+	end
+	local reach = (offHandTarget(f) - SHOULDER.Left).Magnitude / (L1 + L2)
+	f.OffHandFree = reach > (f.OffHandFree and 1.0 or 1.08)
 end
 
 local function armPose(f, pose)
+	f.ArmAvoid = f.ArmAvoid or { Right = {}, Left = {} }
+	updateOffHandGrip(f)
 	if f.Sword and f.Joints.RightShoulder and not f.Joints.RightShoulder.Severed and f.SwordTargetCF then
 		-- orientation-aware IK: aim the wrist, and bend the elbow toward where the forearm would
 		-- naturally be for the requested hand orientation, so the wrist needs minimal bending
 		local handCF = f.SwordTargetCF * GRIP_LOCAL_INV
 		local wrist = handCF:PointToWorldSpace(WRIST_IN_HAND)
 		local idealElbow = wrist + handCF.UpVector * L_FOREARM
-		local rot, flex = solveArm("Right", wrist, idealElbow - SHOULDER.Right, L_FOREARM)
+		local rot, flex = solveArm("Right", wrist, idealElbow - SHOULDER.Right, L_FOREARM, f.ArmAvoid.Right)
 		pose.RightShoulder = rot
 		pose.RightElbow = flex
 	elseif not pose.RightShoulder then
 		hangArms(pose, "Right")
 	end
 	if twoHanded(f) then
-		local offTarget = (f.SwordTargetCF * CFrame.new(0, -0.55 * Config.Sword.HandleLength, 0)).Position
-		local rot, flex = solveArm("Left", offTarget)
+		local rot, flex = solveArm("Left", offHandTarget(f), nil, nil, f.ArmAvoid.Left)
 		pose.LeftShoulder = rot
 		pose.LeftElbow = flex
 	elseif not pose.LeftShoulder then

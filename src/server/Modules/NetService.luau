@@ -1,7 +1,7 @@
 --[[
 	NetService: the only entry points from clients.
 
-	CombatInput (UnreliableRemoteEvent, ~30 Hz): seq, moveX, moveZ, yaw, aimU, aimV, buttons
+	CombatInput (UnreliableRemoteEvent, ~60 Hz): seq, moveX, moveZ, yaw, aimU, aimV, buttons
 	  * token-bucket rate limit per player; malformed or non-finite packets are dropped
 	  * out-of-order packets (seq not increasing) are dropped
 	  * move clamped to unit length, aim clamped to the unit disk, buttons masked to 2 bits

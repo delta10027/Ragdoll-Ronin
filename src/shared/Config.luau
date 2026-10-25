@@ -20,9 +20,9 @@ Config.Debug = {
 }
 
 Config.Network = {
-	ClientSendRate = 30, -- input packets per second
-	BucketCapacity = 20,
-	BucketRefillPerSecond = 70, -- hard cap on accepted input packets
+	ClientSendRate = 60, -- input packets per second (plus one immediately on every button press/release)
+	BucketCapacity = 30,
+	BucketRefillPerSecond = 100, -- hard cap on accepted input packets
 	InputTimeout = 0.6, -- stale input -> neutral (buttons released, no movement)
 	ActionCooldown = 0.25,
 	AnatomySyncInterval = 0.2,
@@ -39,7 +39,7 @@ Config.Physics = {
 
 Config.Movement = {
 	WalkSpeed = 13,
-	Acceleration = 70, -- horizontal control authority when upright (studs/s^2)
+	Acceleration = 120, -- horizontal control authority when upright (studs/s^2)
 	StaggerAcceleration = 18, -- lower authority so hits visibly push the body
 	AttackSpeedMult = 0.6,
 	BlockSpeedMult = 0.5,
@@ -47,7 +47,7 @@ Config.Movement = {
 	OffBalanceSpeedMult = 0.45,
 	KneelSpeedMult = 0.22,
 	TurnRate = math.rad(540),
-	AttackTurnRate = math.rad(160),
+	AttackTurnRate = math.rad(260),
 	StandHeight = 3.62 * S, -- pelvis centre above ground
 	KneelHeightFactor = 0.66,
 	KneelLegSupport = 0.75, -- below this leg support the fighter fights from a kneel
@@ -109,12 +109,13 @@ Config.Sword = {
 Config.Aim = {
 	ReadyU = 0.05,
 	ReadyV = 0.3,
-	Gain = 16, -- how quickly the controller cursor chases the player's cursor (1/s)
-	MaxSpeed = 6.5, -- server cap on cursor speed (disk radii per second)
-	Accel = 30, -- inertia of the controller cursor (1/s)
+	Gain = 32, -- how quickly the controller cursor chases the player's cursor (1/s)
+	MaxSpeed = 9, -- server cap on cursor speed (disk radii per second)
+	Accel = 70, -- inertia of the controller cursor (1/s)
 	EdgeTurnRate = math.rad(1600),
 	EdgeMinSpeed = 0.5,
-	GuardBlendRate = 12,
+	GuardBlendRate = 20,
+	ReadyBlendRate = 10,
 	ClientSensitivity = 0.0042, -- disk radii per mouse pixel while M1/M2 held
 	CameraSensitivity = 0.0035, -- radians per mouse pixel otherwise
 	GripSpreadX = 0.95,
@@ -124,9 +125,33 @@ Config.Aim = {
 	ThrustDepth = 0.55,
 	BladeOutward = 1.25,
 	BladeLift = 0.2,
+	CrossBodyDepth = 0.45, -- extra forward reach when the sword hand crosses to the left
 	GuardRadius = 0.75,
 	GuardBaseY = 0.25,
 	GuardDepth = 1.25,
+	GuardBladeFraction = 0.35, -- how far up the blade the guard meets the threatened line
+	GuardHandDepth = 1.05, -- the guard never pulls the hands closer to the chest than this
+	-- Key poses: grip position (unscaled, upper-torso space: +X right, +Y up, -Z forward) and blade
+	-- direction. Idle: two-handed, hands low in front of the hips, blade angled up and forward.
+	ReadyGrip = Vector3.new(0.08, -0.75, -1.45),
+	ReadyBlade = Vector3.new(-0.08, 0.62, -0.78),
+	-- Windup: cursor pushed up past WindupStart draws the sword back over the head (hands above
+	-- the forehead, blade pointing back behind the head), so pulling the cursor down from there is
+	-- a full vertical cut. WindupPosLead > 1 lifts the hands before the blade rotates back over the
+	-- head so the blade clears it.
+	WindupStart = 0.45,
+	WindupPosLead = 1.3,
+	WindupGrip = Vector3.new(0.1, 2.3, -0.75),
+	WindupBlade = Vector3.new(0.05, 0.4, 0.92),
+	WindupSpreadX = 0.4, -- grip shift per unit of cursor u while wound up (diagonal windups)
+	WindupBladeOutward = 0.3,
+	-- High guard (M2 with the cursor up): blade held flat across in front of the top of the head,
+	-- tip to the right, hands up at the front-left of the forehead, to stop vertical cuts. (The
+	-- tip must go right: the left hand holds the pommel end, so it has to be the hand further left.)
+	HighGuardStart = 0.55, -- cursor direction (vertical component) where the high-guard layout begins
+	HighGuardDrop = 1.3, -- how far the guard sits below HighGuardGrip with the cursor near the centre
+	HighGuardGrip = Vector3.new(-0.15, 2.15, -0.9),
+	HighGuardBlade = Vector3.new(0.98, 0.1, -0.15),
 }
 
 Config.Combat = {

@@ -3,13 +3,19 @@
 
 	Input mapping (all in upper-torso space, so the torso twist carries the sword):
 	  cursor (u, v) on a unit disk, u = right, v = up.
+	  READY pose (no button): two-handed, hands low in front of the hips, blade angled up/forward.
 	  ATTACK pose: grip moves across the body with the cursor; the blade points outward from the
 	    body toward the cursor and forward, so sweeping the cursor sweeps the tip through an arc.
-	    Centre of the disk = blade straight ahead and arms extended (thrust).
+	    Centre of the disk = blade straight ahead and arms extended (thrust). Pushing the cursor to
+	    the top draws the sword back over the head (blade behind the head), so dragging it down
+	    from there is a full vertical cut.
 	  GUARD pose: the cursor picks the threatened side; the blade is laid ACROSS that line
-	    (perpendicular to the radial direction) with the edge facing the threat.
-	  EDGE: while swinging, the cutting edge turns to face the direction the cursor moves (rate
-	    limited), so a deliberate stroke leads with the edge and a sloppy one hits with the flat.
+	    (perpendicular to the radial direction) with the edge facing the threat. Upward threats
+	    hold the blade flat across above the head (high block against vertical cuts).
+	  EDGE: while swinging, the cutting edge turns to face the direction the blade actually moves
+	    (rate limited), so a deliberate stroke leads with the edge and a sloppy one hits with the
+	    flat. While wound up overhead the edge already faces the coming downward cut.
+	  BODY: hands and blade are kept out of the fighter's own torso/head (BodyShape).
 
 	Smoothing/inertia: the server's controller cursor chases the client cursor with a gain, an
 	acceleration limit and a hard speed cap (Config.Aim). The resulting target is applied through
@@ -26,6 +32,7 @@ local Shared = ReplicatedStorage.RagdollRonin
 local Config = require(Shared.Config)
 local Util = require(script.Parent.Util)
 local DebugService = require(script.Parent.DebugService)
+local BodyShape = require(script.Parent.BodyShape)
 
 local SwordController = {}
 
@@ -38,7 +45,7 @@ local REACH_MIN = 0.55 * S
 local DEFAULT_EDGE = Vector3.new(0, -1, 0)
 
 function SwordController.Init(f)
-	f.Aim = { U = A.ReadyU, V = A.ReadyV, VU = 0, VV = 0, Edge = DEFAULT_EDGE, Guard = 0 }
+	f.Aim = { U = A.ReadyU, V = A.ReadyV, VU = 0, VV = 0, Edge = DEFAULT_EDGE, Guard = 0, Ready = 1 }
 	f.Attack = {
 		Phase = "Ready",
 		Stroke = nil,
@@ -56,29 +63,80 @@ function SwordController.Init(f)
 end
 
 ------------------------------------------------------------------ pose mapping
+-- All pose functions return the grip position (scaled, upper-torso space) and blade direction.
+local READY_POS = A.ReadyGrip * S
+local READY_DIR = A.ReadyBlade.Unit
+local WINDUP_DIR = A.WindupBlade.Unit
+local HIGH_GUARD_POS = A.HighGuardGrip * S
+local HIGH_GUARD_DIR = A.HighGuardBlade.Unit
+-- blade point whose motion defines "the direction the cut travels" (mid-blade toward the tip)
+local CUT_POINT = Config.Sword.HandleLength * 0.25 + Config.Sword.BladeLength * 0.6
+
+-- Returns pos, dir and the windup weight (0 = normal attack pose, 1 = fully drawn back overhead).
 local function attackPose(u, v)
 	local r2 = math.min(1, u * u + v * v)
-	local pos = Vector3.new(u * A.GripSpreadX, A.GripBaseY + v * A.GripSpreadY, -(A.GripDepth + A.ThrustDepth * (1 - r2))) * S
+	-- cross-body poses (sword hand on the left) sit further out so the arm clears the chest
+	local depth = A.GripDepth + A.ThrustDepth * (1 - r2) + A.CrossBodyDepth * math.max(0, -u)
+	local pos = Vector3.new(u * A.GripSpreadX, A.GripBaseY + v * A.GripSpreadY, -depth)
 	local dir = Vector3.new(u * A.BladeOutward, v * A.BladeOutward + A.BladeLift, -1).Unit
-	return pos, dir
+	-- above WindupStart the sword is drawn back over the head; the blade rotates through vertical,
+	-- so sweeping the cursor down from the top is one continuous vertical cut
+	local x = math.clamp((v - A.WindupStart) / (1 - A.WindupStart), 0, 1)
+	if x > 0 then
+		local grip = A.WindupGrip + Vector3.new(u * A.WindupSpreadX, 0, 0)
+		local blade = Util.unit(WINDUP_DIR + Vector3.new(u * A.WindupBladeOutward, 0, 0), WINDUP_DIR)
+		pos = pos:Lerp(grip, Util.smoothstep(x * A.WindupPosLead))
+		dir = Util.slerpUnit(dir, blade, Util.smoothstep(x))
+	end
+	return pos * S, dir, x
 end
 
-local function guardPose(u, v)
+-- Direction a point down the blade travels when the cursor moves along (du, dv): the edge leads it
+local function cutDirection(u, v, du, dv, fallback)
+	local m = math.sqrt(du * du + dv * dv)
+	if m < 1e-6 then
+		return fallback
+	end
+	local h = 0.03 / m
+	local p0, d0 = attackPose(u, v)
+	local p1, d1 = attackPose(u + du * h, v + dv * h)
+	return Util.unit((p1 + d1 * CUT_POINT) - (p0 + d0 * CUT_POINT), fallback)
+end
+
+local function guardPose(aim, u, v)
 	local r = math.sqrt(u * u + v * v)
 	local ru, rv = 0, 1
 	if r >= 0.2 then
 		ru, rv = u / r, v / r
 	end
-	-- blade lies across the threatened line; prefer tip-up orientations
+	-- blade lies across the threatened line. Of the two ways along it prefer tip up and to the
+	-- right (the hand order on the hilt makes those reachable); hysteresis stops it flipping
+	-- back and forth near the switch-over.
 	local du, dv = -rv, ru
-	if dv < -0.15 then
-		du, dv = -du, -dv
+	local pref = du * 0.6 + dv * 0.8
+	if not aim.GuardSign then
+		aim.GuardSign = pref >= 0 and 1 or -1
+	elseif pref * aim.GuardSign < -0.3 then
+		aim.GuardSign = -aim.GuardSign
 	end
+	du, dv = du * aim.GuardSign, dv * aim.GuardSign
 	local dir = Vector3.new(du, dv, -0.35).Unit
 	local reach = math.clamp(r, 0.35, 1)
 	local blockPoint = Vector3.new(ru * A.GuardRadius * reach, A.GuardBaseY + rv * A.GuardRadius * reach, -A.GuardDepth) * S
-	local pos = blockPoint - dir * (Config.Sword.BladeLength * 0.45 + Config.Sword.HandleLength * 0.3)
+	local pos = blockPoint - dir * (Config.Sword.BladeLength * A.GuardBladeFraction + Config.Sword.HandleLength * 0.3)
+	-- hands stay out in front of the body
+	pos = Vector3.new(pos.X, pos.Y, math.min(pos.Z, -A.GuardHandDepth * S))
 	local edge = Vector3.new(ru, rv, -0.2)
+	-- upward threats use the high-guard layout (blade flat across, hands front-left): fully out at
+	-- the rim it sits above the head against vertical cuts, nearer the centre it drops to face height
+	local hx = math.clamp((rv - A.HighGuardStart) / (1 - A.HighGuardStart), 0, 1)
+	if hx > 0 then
+		local w = Util.smoothstep(hx)
+		local highPos = HIGH_GUARD_POS - Vector3.new(0, (1 - reach) * A.HighGuardDrop * S, 0)
+		pos = pos:Lerp(highPos, w)
+		dir = Util.slerpUnit(dir, HIGH_GUARD_DIR, w)
+		edge = edge:Lerp(Vector3.yAxis, w)
+	end
 	return pos, dir, edge
 end
 
@@ -91,6 +149,33 @@ local function clampReach(pos)
 		return SHOULDER_R + d / m * REACH_MIN
 	end
 	return pos
+end
+
+-- Keep the hands and blade out of the fighter's own torso and head (they do not collide with it)
+local HAND_CLEARANCE = 0.24 * S
+local BLADE_CLEARANCE = 0.1 * S
+local BLADE_SAMPLES = {}
+for k = 1, 6 do
+	BLADE_SAMPLES[k] = Config.Sword.HandleLength * 0.25 + Config.Sword.BladeLength * (k - 0.5) / 6
+end
+
+local function clearBody(pos, dir)
+	pos = BodyShape.PushOut(pos, HAND_CLEARANCE)
+	for _ = 1, 4 do
+		local worst, wn, wd = 0, nil, 0
+		for _, t in ipairs(BLADE_SAMPLES) do
+			local n, pen = BodyShape.Contact(pos + dir * t, BLADE_CLEARANCE)
+			if n and pen > worst then
+				worst, wn, wd = pen, n, t
+			end
+		end
+		if not wn then
+			break
+		end
+		-- tilt the blade so the deepest sample leaves the body
+		dir = Util.unit(dir * wd + wn * (worst + 0.01), dir)
+	end
+	return pos, dir
 end
 
 ------------------------------------------------------------------ pre-physics: aim -> target
@@ -148,17 +233,27 @@ function SwordController.UpdateAim(f, dt, inp)
 	end
 
 	aim.Guard += ((blocking and 1 or 0) - aim.Guard) * math.min(1, A.GuardBlendRate * dt)
+	aim.Ready += ((mode == "Ready" and 1 or 0) - aim.Ready) * math.min(1, A.ReadyBlendRate * dt)
 
-	local apos, adir = attackPose(aim.U, aim.V)
-	local gpos, gdir, gedge = guardPose(aim.U, aim.V)
+	local apos, adir, windup = attackPose(aim.U, aim.V)
+	local gpos, gdir, gedge = guardPose(aim, aim.U, aim.V)
 	local g = aim.Guard
 	local pos = apos:Lerp(gpos, g)
-	local dir = Util.unit(adir:Lerp(gdir, g), adir)
+	local dir = Util.slerpUnit(adir, gdir, g)
+	local ready = aim.Ready
+	pos = pos:Lerp(READY_POS, ready)
+	dir = Util.slerpUnit(dir, READY_DIR, ready)
 
 	local spd = math.sqrt(aim.VU * aim.VU + aim.VV * aim.VV)
 	local wantEdge
-	if mode == "Attack" and spd > A.EdgeMinSpeed then
-		wantEdge = Vector3.new(aim.VU, aim.VV, 0) / spd
+	if mode == "Attack" then
+		wantEdge = spd > A.EdgeMinSpeed and cutDirection(aim.U, aim.V, aim.VU, aim.VV, aim.Edge) or aim.Edge
+		if windup > 0 then
+			-- while drawn back the edge already faces the coming downward cut (the spine leads
+			-- the backswing), so the cut starts edge-first instead of turning the blade mid-swing
+			local down = cutDirection(aim.U, aim.V, 0, -1, wantEdge)
+			wantEdge = Util.unit(wantEdge:Lerp(down, Util.smoothstep(windup * 2)), down)
+		end
 	elseif mode == "Ready" then
 		wantEdge = DEFAULT_EDGE
 	else
@@ -180,12 +275,15 @@ function SwordController.UpdateAim(f, dt, inp)
 		aim.GuardFlip = false
 	end
 	wantEdge = Util.unit(wantEdge:Lerp(gedge.Unit, g), wantEdge)
+	wantEdge = Util.unit(wantEdge:Lerp(DEFAULT_EDGE, ready), wantEdge)
+
+	pos = clampReach(pos)
+	pos, dir = clearBody(pos, dir)
 	wantEdge = Util.perpendicular(wantEdge, dir, Util.perpendicular(DEFAULT_EDGE, dir, Vector3.xAxis))
 	local cur = Util.perpendicular(aim.Edge, dir, wantEdge)
 	aim.Edge = Util.rotateToward(cur, wantEdge, A.EdgeTurnRate * dt)
 	local X = Util.perpendicular(aim.Edge, dir, wantEdge)
 
-	pos = clampReach(pos)
 	f.SwordTargetCF = CFrame.fromMatrix(pos, X, dir, X:Cross(dir))
 end
 
