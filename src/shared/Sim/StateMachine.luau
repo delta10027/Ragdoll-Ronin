@@ -42,7 +42,7 @@ local function apply(f, to, reason, data)
 	end
 	if f.Model.Parent then
 		f.Model:SetAttribute("State", to)
-		f.Model:SetAttribute("StateReason", tostring(reason))
+		f.Model:SetAttribute("StateReason", string.sub(tostring(reason), 1, 50)) -- (attribute strings are capped at 50)
 	end
 	f.AnatomyDirty = true
 	Runtime.Debug.Transition(f, from, to, reason)

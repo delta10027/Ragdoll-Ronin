@@ -73,10 +73,18 @@ function DebugService.Marker(position, color, size)
 	Debris:AddItem(p, Config.Debug.ContactMarkerLifetime)
 end
 
--- Event attribute (always on)
+-- Event attribute (always on). String attributes are limited to 50 characters, and a debug label
+-- must never break the code that sets it (it once aborted every damaging hit halfway through).
+local ATTR_MAX = 50
 function DebugService.Attr(f, name, value)
 	if f.Model and f.Model.Parent then
-		f.Model:SetAttribute(name, value)
+		if type(value) == "string" and #value > ATTR_MAX then
+			value = value:sub(1, ATTR_MAX - 3) .. "..."
+		end
+		local ok, err = pcall(f.Model.SetAttribute, f.Model, name, value)
+		if not ok then
+			warn("[RR] debug attribute " .. tostring(name) .. ": " .. tostring(err))
+		end
 	end
 end
 
