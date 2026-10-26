@@ -290,9 +290,11 @@ function SwordController.UpdateAim(f, dt, inp)
 	local spd = math.sqrt(aim.VU * aim.VU + aim.VV * aim.VV)
 	local wantEdge
 	if mode == "Attack" then
-		-- at rest (no windup) the edge settles to a fixed comfortable roll instead of keeping whatever
-		-- it had: a leftover edge facing down makes the arm IK lift the elbow over the hand
-		local rest = Util.perpendicular(A.RestEdge, dir, aim.Edge)
+		-- at rest (no windup) the edge settles to face away from the body instead of keeping whatever
+		-- it had: the forearm then points outward with the elbow between body and hand, and the edge
+		-- can never end up facing the fighter (e.g. after a vertical cut)
+		local mid = pos + dir * CUT_POINT
+		local rest = Util.perpendicular(Util.unit(mid, dir), dir, Util.perpendicular(DEFAULT_EDGE, dir, Vector3.xAxis))
 		wantEdge = spd > A.EdgeMinSpeed and cutDirection(aim.U, aim.V, aim.VU, aim.VV, aim.Edge) or rest
 		if windup > 0 then
 			-- while drawn back the edge already faces the coming cut (back through the centre of

@@ -83,9 +83,9 @@ field(UT, "RecoilUntil", function(f) return f.Attack.RecoilUntil end, function(f
 -- motor controller memory
 field(UT, "LimbsCollide", function(f) return f.LimbsCollide end, function(f, v) f.LimbsCollide = v end)
 field(UT, "OffHandFree", function(f) return f.OffHandFree end, function(f, v) f.OffHandFree = v == true end)
-field(UT, "ArmStepR", function(f) return f.ArmAvoid and f.ArmAvoid.Right.Step end, function(f, v) f.ArmAvoid.Right.Step = v end)
-field(UT, "ArmStepL", function(f) return f.ArmAvoid and f.ArmAvoid.Left.Step end, function(f, v) f.ArmAvoid.Left.Step = v end)
-field(UT, "ArmRollR", function(f) return f.ArmAvoid and f.ArmAvoid.Right.Roll end, function(f, v) f.ArmAvoid.Right.Roll = v end)
+field(UT, "ArmSwivelR", function(f) return f.ArmState and f.ArmState.Swivel end, function(f, v) f.ArmState.Swivel = v or 0 end)
+field(UT, "ArmRollR", function(f) return f.ArmState and f.ArmState.Roll end, function(f, v) f.ArmState.Roll = v or 0 end)
+field(UT, "ArmSwivelL", function(f) return f.ArmState and f.ArmState.SwivelL end, function(f, v) f.ArmState.SwivelL = v or 0 end)
 -- server-only inputs to the simulation
 field(UT, "TotalMass", function(f) return f.TotalMass end, function(f, v) f.TotalMass = v or 1 end)
 local CAP_KEYS = { "LegLeft", "LegRight", "LegSupport", "SwordArm", "OffArm", "Grip", "Strength", "Move", "Stability", "BalanceRegen", "BalanceMax", "Kneeling", "Incapacitated" }
@@ -266,7 +266,7 @@ function SimState.BuildClient(model, player)
 		Aim = { U = Config.Aim.ReadyU, V = Config.Aim.ReadyV, VU = 0, VV = 0, Edge = Vector3.new(0, -1, 0), Guard = 0, Ready = 1 },
 		Attack = { Phase = "Ready", RecoilUntil = 0, SegmentHitTimes = {} },
 		Block = { Active = false, StartTime = 0 },
-		ArmAvoid = { Right = {}, Left = {} },
+		ArmState = { Swivel = 0, Roll = 0, SwivelL = 0 },
 	}
 end
 

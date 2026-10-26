@@ -77,11 +77,20 @@ Config.Drives = {
 		Neck = { Torque = 1200, Responsiveness = 40 },
 		Head = { Torque = 700, Responsiveness = 40 },
 		Shoulder = { Torque = 1000, Responsiveness = 40 },
-		Wrist = { Torque = 120, Responsiveness = 30 },
+		Wrist = { Torque = 400, Responsiveness = 40 }, -- the sword wrist is posed by the arm solve too (MotorController)
 		Hip = { Torque = 2200, Responsiveness = 45 },
 		Ankle = { Torque = 500, Responsiveness = 35 },
 		Elbow = { Torque = 900, Speed = 14 },
 		Knee = { Torque = 2200, Speed = 14 },
+	},
+	-- arm solve (MotorController): the elbow swivel / sword roll search and how fast the arm may move
+	-- toward a new answer, so branch changes swing the elbow round instead of snapping it
+	Arm = {
+		SwivelRate = 10, -- rad/s
+		RollRate = 8, -- rad/s
+		RollCost = 0.05, -- per radian the sword is rolled away from the edge SwordController asked for
+		SwivelCost = 0.02, -- per radian of elbow swivel away from the natural down-and-out elbow
+		Hysteresis = 0.01, -- per radian of change from the current swivel / roll
 	},
 	HandForce = 3500,
 	BlockHandMult = 1.6, -- sword hand drive strength while blocking, so a held guard stops a swing
@@ -151,9 +160,6 @@ Config.Aim = {
 	AttackPosLead = 1.3, -- > 1: hands reach the rim position before the blade finishes turning, so
 	-- drawing the cursor in from a windup first swings the blade over, then brings the hands through
 	RimPrepStart = 0.6, -- cursor radius where the windup edge pre-aim starts
-	-- edge roll the attack pose settles to while the cursor rests away from a windup (finishes, centre):
-	-- forward and a little up, so the sword hand's forearm comes from below and the elbow stays low
-	RestEdge = Vector3.new(-0.3, 0.3, -1).Unit,
 	HipTwist = 0.4, -- the hips turn this fraction of the body twist, on top of the waist
 	AttackCenter = { Grip = Vector3.new(0, 0.15, -1.55), Blade = Vector3.new(0, 0.12, -1) },
 	AttackKeys = {
