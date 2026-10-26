@@ -15,7 +15,9 @@
 	  GUARD pose: the cursor picks the threatened side; key poses (Config.Aim.GuardKeys) hold the
 	    blade out beyond the body on that side with the edge facing the threat: flat across above
 	    the head for an upward threat, upright beside the body for the sides. Blades physically
-	    collide (SwordBuilder collider), so a held guard stops a swing where they meet.
+	    collide (SwordBuilder collider), and an attack that meets a guard or blade is BOUND
+	    (SwordController.Bind): its cursor stops where they met and can only be drawn back, so a
+	    blocked cut has to be pulled out (or M1 released) before the sword can go anywhere else.
 	  EDGE: while swinging, the cutting edge turns to face the direction the blade actually moves
 	    (rate limited), so a deliberate stroke leads with the edge and a sloppy one hits with the
 	    flat. While wound up overhead the edge already faces the coming downward cut.
@@ -275,6 +277,22 @@ function SwordController.UpdateAim(f, dt, inp)
 	if r > 1 then
 		aim.U, aim.V = aim.U / r, aim.V / r
 	end
+	-- a blocked attack is bound to the blade it met (SwordController.Bind): the cursor cannot push
+	-- on, only draw back, until the fighter retreats far enough, lets go of M1 or changes stance
+	local bind = aim.Bind
+	if bind then
+		local back = -((aim.U - bind.U) * bind.DU + (aim.V - bind.V) * bind.DV)
+		if mode ~= "Attack" or not inp.M1 or back >= A.BindRelease then
+			aim.Bind = nil
+		else
+			aim.U, aim.V = SwordController.ConstrainCursor(aim.U, aim.V, bind)
+			local push = aim.VU * bind.DU + aim.VV * bind.DV
+			if push > 0 then
+				aim.VU -= push * bind.DU
+				aim.VV -= push * bind.DV
+			end
+		end
+	end
 
 	aim.Guard += ((blocking and 1 or 0) - aim.Guard) * math.min(1, A.GuardBlendRate * dt)
 	aim.Ready += ((mode == "Ready" and 1 or 0) - aim.Ready) * math.min(1, A.ReadyBlendRate * dt)
@@ -332,6 +350,78 @@ function SwordController.UpdateAim(f, dt, inp)
 	f.SwordTargetCF = CFrame.fromMatrix(pos, X, dir, X:Cross(dir))
 end
 
+------------------------------------------------------------------ bind (blocked attacks)
+-- Where a bound cursor may be: behind the point the attack was stopped at (along the direction it
+-- was travelling), with a little sideways slack that widens the further it is drawn back.
+-- Shared with the client, which holds its own cursor the same way so the circle shows the stop.
+function SwordController.ConstrainCursor(u, v, bind)
+	local du, dv = u - bind.U, v - bind.V
+	local s = math.min(0, du * bind.DU + dv * bind.DV)
+	local p = du * -bind.DV + dv * bind.DU
+	local slack = A.BindSlack - s
+	p = math.clamp(p, -slack, slack)
+	return bind.U + bind.DU * s - bind.DV * p, bind.V + bind.DV * s + bind.DU * p
+end
+
+-- Server: the attack met a guard or another blade. The cursor is pulled back to the pose that
+-- matches where the blade actually is (the cursor and the sword target run ahead of the physical
+-- blade), plus a small rebound, and held there (UpdateAim). Returns true when newly bound.
+function SwordController.Bind(f)
+	local aim = f.Aim
+	if aim.Bind or f.State ~= "Attacking" then
+		return false
+	end
+	local du, dv = aim.VU, aim.VV
+	local m = math.sqrt(du * du + dv * dv)
+	if m < A.BindMinSpeed then
+		-- barely moving: the push is taken to be toward the centre of the disk (through the cut)
+		du, dv = -aim.U, -aim.V
+		m = math.sqrt(du * du + dv * dv)
+	end
+	if m < 1e-3 then
+		du, dv, m = 0, -1, 1
+	end
+	du, dv = du / m, dv / m
+	-- walk back along the travel direction to the pose closest to the physical blade
+	local u, v = aim.U, aim.V
+	local ut = f.Parts.UpperTorso
+	if f.Sword and ut then
+		local blade = ut.CFrame:VectorToObjectSpace(f.Sword.Handle.CFrame.YVector)
+		local best, bestDot = 0, -2
+		for k = 0, 30 do
+			local s = k * 0.05
+			local _, d = attackPose(aim.U - du * s, aim.V - dv * s)
+			local dot = d:Dot(blade)
+			if dot > bestDot + 1e-4 then
+				best, bestDot = s, dot
+			elseif dot < bestDot - 0.1 then
+				break -- past the match (going further back would only find the windup side)
+			end
+		end
+		u, v = aim.U - du * best, aim.V - dv * best
+	end
+	u, v = u - du * A.BindRebound, v - dv * A.BindRebound
+	local r = math.sqrt(u * u + v * v)
+	if r > 1 then
+		u, v = u / r, v / r
+	end
+	aim.U, aim.V, aim.VU, aim.VV = u, v, 0, 0
+	aim.Bind = { U = u, V = v, DU = du, DV = dv }
+	return true
+end
+
+-- Server, outside the simulation: mirror the bind on the model for the owner's cursor UI (under
+-- server authority the client reads its own predicted copy from SimState's attributes instead)
+function SwordController.PublishBind(f)
+	local b = f.Aim and f.Aim.Bind
+	local key = b and string.format("%.3f %.3f %.3f %.3f", b.U, b.V, b.DU, b.DV) or ""
+	if f.PublishedBind ~= key then
+		f.PublishedBind = key
+		f.Model:SetAttribute("AimBind", b and Vector3.new(b.U, b.V, 0) or nil)
+		f.Model:SetAttribute("AimBindDir", b and Vector3.new(b.DU, b.DV, 0) or nil)
+	end
+end
+
 ------------------------------------------------------------------ strokes
 function SwordController.StartStroke(f, dir)
 	local atk = f.Attack
@@ -370,7 +460,8 @@ local function setPhase(f, phase)
 	end
 end
 
--- Post-physics. Returns sweep info {PrevCF, CF, Dt, Stroke} if the blade may strike this frame.
+-- Post-physics. Returns sweep info {PrevCF, CF, Dt, Stroke} if the blade may strike this frame
+-- (Stroke = nil: it may only meet other blades, see CombatResolver.Process).
 function SwordController.Track(f, dt, inp)
 	local atk = f.Attack
 	if not f.Sword then
@@ -434,6 +525,9 @@ function SwordController.Track(f, dt, inp)
 
 	if s then
 		return { PrevCF = prev, CF = cf, Dt = dt, Stroke = s }
+	elseif f.State == "Attacking" and not f.Aim.Bind then
+		-- no damaging stroke, but a slow push into a guard or blade still binds (CombatResolver)
+		return { PrevCF = prev, CF = cf, Dt = dt, Stroke = nil }
 	end
 	return nil
 end

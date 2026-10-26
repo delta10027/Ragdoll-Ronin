@@ -18,7 +18,8 @@ Config.Debug = {
 	AttributeRate = 10, -- Hz for high-frequency debug attributes (sword speed)
 	DevToolsInStudio = true, -- ServerStorage.RR_DevCommand bindable (Studio only)
 	TestDummies = true, -- spawn a line of respawning practice dummies when the first player joins (server TestDummies)
-	TestDummyLine = { Distance = 22, Spacing = 8 }, -- studs in front of the spawn (-Z), studs between dummies
+	TestDummyLine = { Distance = 22, Spacing = 8, FaceRange = 30 }, -- studs in front of the spawn (-Z), studs between
+	-- dummies, and how close a player must be for a dummy to turn and face them
 	TestDummyTiming = {
 		StartDelay = 2, -- seconds after spawning before a dummy starts its behaviour (it stands up first)
 		SwingPeriod = 3, -- one swing every this many seconds
@@ -147,6 +148,12 @@ Config.Aim = {
 	EdgeMinSpeed = 0.5,
 	LagSlowStart = math.rad(45), -- sword target this far behind the cursor's pose: the cursor slows...
 	LagStop = math.rad(90), -- ...and stops here until the target catches up (see SwordController.UpdateAim)
+	-- a blocked, parried or clashing attack is BOUND to the blade it met: the cursor stops there and
+	-- can only be drawn back (SwordController.Bind), so a blocked cut must be pulled out and retried
+	BindRebound = 0.12, -- disk radii the cursor is knocked back from where the blades met
+	BindRelease = 0.3, -- drawing the cursor back this far frees the sword (as does releasing M1)
+	BindSlack = 0.1, -- sideways play of a bound cursor (widens as it is drawn back)
+	BindMinSpeed = 0.3, -- slower than this at contact: the push is taken to be toward the disk centre
 	GuardBlendRate = 20,
 	ReadyBlendRate = 10,
 	ClientSensitivity = 0.0042, -- disk radii per mouse pixel while M1/M2 held
