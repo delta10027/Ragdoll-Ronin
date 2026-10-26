@@ -251,15 +251,15 @@ function SwordController.UpdateAim(f, dt, inp)
 	local k = math.min(1, A.Accel * dt)
 	aim.VU += (du - aim.VU) * k
 	aim.VV += (dv - aim.VV) * k
-	-- the cursor waits for the sword: when the physical blade lags far behind the pose the cursor
-	-- asks for (a very fast circle, or a blade stopped by a block), cursor motion that would add to
-	-- the lag slows and finally stops until the sword catches up (moving back toward the sword is
-	-- never held). Past 180 degrees of lag the hand's orientation drive would take the short way
-	-- round and swing the sword the wrong way (e.g. pointing down overhead).
+	-- the cursor waits for the sword target: the hand drive's target turns toward the requested
+	-- pose at a capped rate (MotorController, f.SwordAimDir), so when the cursor runs far ahead of it, cursor motion
+	-- that would add to the gap slows and finally stops until the target catches up (moving back
+	-- toward it is never held). The target always catches up, so this cannot deadlock; keeping the
+	-- gap small means the hand drive's short way round is always the right way.
 	local follow = 1
-	if mode ~= "Ready" and f.Sword and f.Sword.Blade and f.Parts.UpperTorso then
+	if mode ~= "Ready" and f.Sword and f.SwordAimDir then
 		local pose = mode == "Guard" and guardPose or attackPose
-		local blade = f.Parts.UpperTorso.CFrame:VectorToObjectSpace(f.Sword.Blade.CFrame.UpVector)
+		local blade = f.SwordAimDir.Unit
 		local function lagAt(u, v)
 			local _, d = pose(u, v)
 			return math.acos(math.clamp(blade:Dot(d), -1, 1))
