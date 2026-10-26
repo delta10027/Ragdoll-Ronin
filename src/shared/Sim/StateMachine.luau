@@ -64,6 +64,15 @@ function StateMachine.Set(f, to, reason, data)
 	return true
 end
 
+-- Owner mode (server OwnerSync): adopt the state the owning client's simulation is in, whatever
+-- the table says - that client is the one simulating the body
+function StateMachine.Mirror(f, to, data)
+	if f.State == to or f.State == "Dead" then
+		return
+	end
+	apply(f, to, "Owner", data)
+end
+
 -- Death bypasses the table (any living state may die)
 function StateMachine.ForceDead(f, reason)
 	if f.State == "Dead" then

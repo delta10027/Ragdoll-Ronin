@@ -13,6 +13,7 @@
 	All drive strengths start at zero; MotorController sets them every frame from the state machine,
 	so exactly one system owns every joint.
 ]]
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage.RagdollRonin
 local Config = require(Shared.Config)
@@ -318,14 +319,25 @@ function CharacterBuilder.Build(spawnCF, opts)
 	}
 end
 
--- Server-owned physics: clients never simulate fighter bodies (authority + exploit resistance).
+-- Who simulates a fighter's body: the server (nil), except a player's own fighter in Owner mode
+function CharacterBuilder.ExpectedOwner(model)
+	if not Runtime.OwnerPhysics then
+		return nil
+	end
+	local uid = model:GetAttribute("OwnerUserId")
+	return uid and Players:GetPlayerByUserId(uid) or nil
+end
+
+-- Pin network ownership (never left to the engine's automatic choice, which hands bodies near a
+-- player to that player's client)
 function CharacterBuilder.ClaimOwnership(model)
 	if Runtime.ServerAuthority then
 		return -- the engine keeps server authority itself (and predicts the owner's fighter)
 	end
+	local owner = CharacterBuilder.ExpectedOwner(model)
 	for _, d in ipairs(model:GetDescendants()) do
 		if d:IsA("BasePart") and not d.Anchored then
-			pcall(d.SetNetworkOwner, d, nil)
+			pcall(d.SetNetworkOwner, d, owner)
 		end
 	end
 end

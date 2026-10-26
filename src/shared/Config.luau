@@ -29,9 +29,17 @@ Config.Debug = {
 }
 
 Config.Network = {
-	-- Must match Workspace.AuthorityMode (true = Server). Game scripts cannot read that property
+	-- How fighters are simulated. Must match Workspace.AuthorityMode, which game scripts cannot read
 	-- (RobloxScriptSecurity), so it is mirrored here; see Shared.Sim.Runtime.
-	ServerAuthority = true,
+	--   "Owner"            AuthorityMode = Automatic. Each player's client simulates their own fighter
+	--                      (no input delay) and reports its stance; the server simulates the dummies,
+	--                      decides every hit, block and reaction and sends those back (server OwnerSync).
+	--                      The owner's body is trusted, so this is for testing, not public servers.
+	--   "ServerAuthority"  AuthorityMode = Server. The server simulates everyone; the owning client
+	--                      predicts its fighter with rollback (Shared.Sim.SimState).
+	--   "Server"           AuthorityMode = Automatic. The server simulates everyone; clients only send
+	--                      input (a network round trip of input delay).
+	Mode = "Owner",
 	ClientSendRate = 60, -- input packets per second (plus one immediately on every button press/release)
 	BucketCapacity = 30,
 	BucketRefillPerSecond = 100, -- hard cap on accepted input packets
