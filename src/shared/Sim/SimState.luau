@@ -16,7 +16,9 @@
 	QUANTUM, and the rounded value is what both sides continue from: the client may compute the
 	last digits of a sin/acos differently from the server, and rounding absorbs that.
 	Injury-derived capabilities and segment strengths are server-only inputs; the client just reads
-	them. Store() skips unchanged values; OnRollback() forgets what was written so nothing is skipped
+	them. In Owner mode (Runtime.OwnerPhysics) the same attributes are the owning client's own
+	state store: the server writes everything once at spawn and afterwards only those server-only
+	inputs (StoreServer); its other decisions arrive through OwnerSync. Store() skips unchanged values; OnRollback() forgets what was written so nothing is skipped
 	after the engine restores older values.
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -32,8 +34,9 @@ local QUANTUM = 1e-6
 local FIELDS = {} -- { Part, Name, Get(f), Set(f, v) }
 local VECS = {} -- { Part, Name, Get(f), Set(f, v) }: stored as three number attributes
 
-local function field(part, name, get, set)
-	table.insert(FIELDS, { Part = part, Name = "S_" .. name, Get = get, Set = set })
+-- server: true for values only the server computes (injuries); StoreServer() writes just those
+local function field(part, name, get, set, server)
+	table.insert(FIELDS, { Part = part, Name = "S_" .. name, Get = get, Set = set, Server = server })
 end
 
 local function vecField(part, name, get, set)
@@ -107,10 +110,10 @@ field(UT, "ArmSwivelR", function(f) return f.ArmState and f.ArmState.Swivel end,
 field(UT, "ArmRollR", function(f) return f.ArmState and f.ArmState.Roll end, function(f, v) f.ArmState.Roll = v or 0 end)
 field(UT, "ArmSwivelL", function(f) return f.ArmState and f.ArmState.SwivelL end, function(f, v) f.ArmState.SwivelL = v or 0 end)
 -- server-only inputs to the simulation
-field(UT, "TotalMass", function(f) return f.TotalMass end, function(f, v) f.TotalMass = v or 1 end)
+field(UT, "TotalMass", function(f) return f.TotalMass end, function(f, v) f.TotalMass = v or 1 end, true)
 local CAP_KEYS = { "LegLeft", "LegRight", "LegSupport", "SwordArm", "OffArm", "Grip", "Strength", "Move", "Stability", "BalanceRegen", "BalanceMax", "Kneeling", "Incapacitated" }
 for _, key in ipairs(CAP_KEYS) do
-	field(UT, "Cap_" .. key, function(f) return f.Caps[key] end, function(f, v) f.Caps[key] = v end)
+	field(UT, "Cap_" .. key, function(f) return f.Caps[key] end, function(f, v) f.Caps[key] = v end, true)
 end
 local SEGMENTS = {}
 for name in pairs(Anatomy.Segments) do
@@ -118,7 +121,7 @@ for name in pairs(Anatomy.Segments) do
 end
 table.sort(SEGMENTS)
 for _, name in ipairs(SEGMENTS) do
-	field(LT, "Seg_" .. name, function(f) return f.SegFactor[name] end, function(f, v) f.SegFactor[name] = v or 0 end)
+	field(LT, "Seg_" .. name, function(f) return f.SegFactor[name] end, function(f, v) f.SegFactor[name] = v or 0 end, true)
 end
 
 local NIL = {} -- remembers "attribute cleared" in SimWritten
@@ -131,7 +134,7 @@ local function write(part, written, name, v)
 	end
 end
 
-function SimState.Store(f)
+function SimState.Store(f, serverOnly)
 	local written = f.SimWritten
 	if not written then
 		written = {}
@@ -139,7 +142,7 @@ function SimState.Store(f)
 	end
 	for _, fd in ipairs(FIELDS) do
 		local part = f.Parts[fd.Part]
-		if part then
+		if part and (fd.Server or not serverOnly) then
 			local v = fd.Get(f)
 			if type(v) == "number" then
 				local r = q(v)
@@ -152,7 +155,7 @@ function SimState.Store(f)
 		end
 	end
 	for _, vd in ipairs(VECS) do
-		local part = f.Parts[vd.Part]
+		local part = not serverOnly and f.Parts[vd.Part]
 		if part then
 			local v = vd.Get(f)
 			local x, y, z
@@ -165,6 +168,12 @@ function SimState.Store(f)
 			write(part, written, vd.Z, z)
 		end
 	end
+end
+
+-- Owner mode: the owning client simulates the fighter and keeps everything else; the server only
+-- publishes the injury-derived values (see server OwnerSync)
+function SimState.StoreServer(f)
+	SimState.Store(f, true)
 end
 
 -- Returns false until the server has written the state at least once

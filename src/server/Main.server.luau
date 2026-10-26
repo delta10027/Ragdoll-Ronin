@@ -2,7 +2,8 @@
 	Ragdoll Ronin - server bootstrap and the single centralized update loop.
 
 	Controllers (before physics): state logic -> aim/sword target -> motors & drives
-	  normally in PreSimulation; under server authority (Workspace.AuthorityMode = Server) inside
+	  normally in PreSimulation (in Owner mode not for players' fighters: their own clients run
+	  them, see OwnerSync); under server authority (Workspace.AuthorityMode = Server) inside
 	  RunService:BindToSimulation, so the owning client can run the same step to predict its own
 	  fighter (see Shared.Sim.SimState). Validation, disarming and debug then run on Heartbeat.
 	PostSimulation (after physics):  blade stroke tracking -> swept hit detection -> combat resolution
@@ -33,6 +34,7 @@ local DebugService = require(Modules.DebugService)
 local DevTools = require(Modules.DevTools)
 local TestDummies = require(Modules.TestDummies)
 local Dismemberment = require(Modules.Dismemberment)
+local OwnerSync = require(Modules.OwnerSync)
 local Runtime = require(Shared.Sim.Runtime)
 local SimState = require(Shared.Sim.SimState)
 
@@ -40,6 +42,7 @@ Runtime.Debug = DebugService
 
 CollisionSetup.Init()
 DebugService.Init()
+OwnerSync.Init()
 CombatResolver.SetKill(Lifecycle.Kill)
 NetService.SetReset(function(f)
 	Lifecycle.Kill(f, "Reset")
@@ -97,7 +100,11 @@ local function stepPre(f, dt)
 		return
 	end
 	checkDisarm(f)
-	stepControllers(f, dt)
+	if OwnerSync.Applies(f) then
+		OwnerSync.Pre(f, Input.Get(f)) -- the owner's client runs this fighter's controllers
+	else
+		stepControllers(f, dt)
+	end
 	SwordController.PublishBind(f)
 	DebugService.Tick(f)
 end
@@ -164,14 +171,15 @@ local anatomyRemote = Shared.Remotes.AnatomyUpdate
 local CharacterBuilder = require(Modules.CharacterBuilder)
 local bleedAccum, syncAccum, heartbeat, ownerAccum = 0, 0, 0, 0
 
--- Ownership guard: live fighter bodies must always be simulated by the server.
+-- Ownership guard: live fighter bodies are always simulated by the server, except a player's own
+-- fighter in Owner mode, which its client simulates (CharacterBuilder.ExpectedOwner).
 local function guardOwnership()
 	for _, f in ipairs(Registry.List()) do
 		local pelvis = f.Parts.LowerTorso
 		if not f.Removed and pelvis and pelvis.Parent then
 			local okAuto, auto = pcall(pelvis.GetNetworkOwnershipAuto, pelvis)
 			local okOwner, owner = pcall(pelvis.GetNetworkOwner, pelvis)
-			if (okAuto and auto) or (okOwner and owner ~= nil) then
+			if (okAuto and auto) or (okOwner and owner ~= CharacterBuilder.ExpectedOwner(f.Model)) then
 				DebugService.Log("reclaiming network ownership of", f.Name)
 				CharacterBuilder.ClaimOwnership(f.Model)
 			end
@@ -180,6 +188,12 @@ local function guardOwnership()
 end
 
 RunService.Heartbeat:Connect(function(dt)
+	-- Owner mode: tell each owner what combat decided about their fighter this frame
+	for _, f in ipairs(Registry.List()) do
+		if OwnerSync.Applies(f) then
+			guarded(f, "ownersync", OwnerSync.Flush, f)
+		end
+	end
 	-- prompt re-claim after the body's assembly changed (wound marks, stumps, dropped sword).
 	-- Under server authority the engine keeps everything server-owned and predicts instead.
 	if not Runtime.ServerAuthority then
@@ -224,4 +238,9 @@ RunService.Heartbeat:Connect(function(dt)
 	end
 end)
 
-print("[RR] Ragdoll Ronin combat server ready" .. (Runtime.ServerAuthority and " (server authority + client prediction)" or ""))
+local MODE_TEXT = {
+	ServerAuthority = " (server authority + client prediction; Workspace.AuthorityMode must be Server)",
+	Owner = " (owner mode: each client simulates its own fighter; Workspace.AuthorityMode must be Automatic)",
+	Server = " (server simulates everyone; Workspace.AuthorityMode must be Automatic)",
+}
+print("[RR] Ragdoll Ronin combat server ready" .. (MODE_TEXT[Runtime.Mode] or (" (unknown Config.Network.Mode " .. tostring(Runtime.Mode) .. ")")))

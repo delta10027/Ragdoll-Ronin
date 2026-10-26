@@ -95,7 +95,7 @@ function BalanceController.KnockDown(f, pushDir, power, reason)
 		for _, name in ipairs({ "UpperTorso", "Head" }) do
 			local p = f.Parts[name]
 			if p then
-				p:ApplyImpulse(dir * dv * p.AssemblyMass)
+				Runtime.Impulse(p, dir * dv * p.AssemblyMass)
 			end
 		end
 	end

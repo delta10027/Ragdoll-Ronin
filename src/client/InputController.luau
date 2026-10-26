@@ -49,6 +49,9 @@ function InputController.Init(ctx)
 			s.PressTime = os.clock()
 		elseif io.KeyCode == Enum.KeyCode.Space then
 			ctx.Remotes.CombatAction:FireServer("Recover")
+			if ctx.Prediction and ctx.Prediction.Owner then
+				ctx.Prediction.RecoverPending = true -- this client runs its own fighter (Owner mode)
+			end
 		elseif io.KeyCode == Enum.KeyCode.V then
 			CameraController.ToggleFront(ctx)
 		end
@@ -123,7 +126,16 @@ function InputController.Update(ctx, dt)
 		s.LastButtons = buttons
 		s.LastSend = now
 		s.Seq += 1
-		ctx.Remotes.CombatInput:FireServer(s.Seq, s.Move.X, s.Move.Z, ctx.Camera.Yaw, s.AimU, s.AimV, buttons)
+		local p = ctx.Prediction
+		local f = p and p.Owner and p.Fighter
+		if f and f.State then
+			-- Owner mode: also report this client's simulation of its fighter (server OwnerSync)
+			local aim = f.Aim
+			ctx.Remotes.CombatInput:FireServer(s.Seq, s.Move.X, s.Move.Z, ctx.Camera.Yaw, s.AimU, s.AimV, buttons,
+				f.State, f.Balance or 0, f.Block.Active == true, aim.U, aim.V, aim.VU, aim.VV, aim.Bind ~= nil, p.Ack)
+		else
+			ctx.Remotes.CombatInput:FireServer(s.Seq, s.Move.X, s.Move.Z, ctx.Camera.Yaw, s.AimU, s.AimV, buttons)
+		end
 	end
 end
 

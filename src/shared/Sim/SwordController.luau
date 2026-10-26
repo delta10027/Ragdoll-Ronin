@@ -472,6 +472,14 @@ function SwordController.Track(f, dt, inp)
 	end
 	local cf = f.Sword.Blade.CFrame
 	local prev = atk.PrevBladeCF
+	if f.RemoteBody and prev and cf == prev and (atk.HeldDt or 0) < 0.2 then
+		-- a body its owner simulates (Owner mode) arrives by replication, not every frame: wait for
+		-- the next pose and measure the motion over the whole gap
+		atk.HeldDt = (atk.HeldDt or 0) + dt
+		return nil
+	end
+	dt += atk.HeldDt or 0
+	atk.HeldDt = 0
 	atk.PrevBladeCF = cf
 	if not prev or dt <= 0 then
 		return nil

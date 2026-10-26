@@ -76,7 +76,7 @@ end
 local function deflect(f, dir, dv)
 	if f.Sword and f.Sword.Handle.Parent then
 		local h = f.Sword.Handle
-		h:ApplyImpulse(Util.unit(dir, Vector3.yAxis) * dv * h.AssemblyMass)
+		Runtime.Impulse(h, Util.unit(dir, Vector3.yAxis) * dv * h.AssemblyMass)
 	end
 end
 
@@ -192,7 +192,7 @@ local function react(att, target, h, dir, power, segName, strike)
 	-- bounded physical impulse on the struck segment
 	if h.Part.Parent and Registry.FromPart(h.Part) == target then
 		local dv = math.min(power * C.HitDVPerPower, C.MaxHitDV)
-		h.Part:ApplyImpulse(dir * dv * h.Part.AssemblyMass)
+		Runtime.Impulse(h.Part, dir * dv * h.Part.AssemblyMass)
 	end
 
 	target.Balance -= power * BL.CostPerPower * locMult * stateMult * injuryMult
