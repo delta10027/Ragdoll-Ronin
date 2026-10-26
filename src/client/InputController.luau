@@ -11,8 +11,8 @@
 	  * CTRL (held): crouch
 	  * 1: draw / sheathe the sword (animated, Shared.Sim.Draw); a tap held like the kick
 	  * G: bow (Shared.Sim.Bow); a tap held like the kick
-	Packet: seq, moveX, moveZ, yaw, aimU, aimV, buttons (bit0 = M1, bit1 = M2, bit2 = kick, bit3 = crouch,
-	  bit4 = draw/sheathe, bit5 = bow)
+	Packet (packed into a buffer, Shared.Sim.InputPacket): seq, moveX, moveZ, yaw, aimU, aimV,
+	  buttons (bit0 = M1, bit1 = M2, bit2 = kick, bit3 = crouch, bit4 = draw/sheathe, bit5 = bow)
 ]]
 local UserInputService = game:GetService("UserInputService")
 local GuiService = game:GetService("GuiService")
@@ -22,6 +22,7 @@ local CameraController = require(script.Parent.CameraController)
 local Sim = ReplicatedStorage:WaitForChild("RagdollRonin"):WaitForChild("Sim")
 local Runtime = require(Sim:WaitForChild("Runtime"))
 local SimInput = require(Sim:WaitForChild("SimInput"))
+local InputPacket = require(Sim:WaitForChild("InputPacket"))
 local SwordController = require(Sim:WaitForChild("SwordController"))
 
 local InputController = {}
@@ -151,14 +152,17 @@ function InputController.Update(ctx, dt)
 		s.Seq += 1
 		local p = ctx.Prediction
 		local f = p and p.Owner and p.Fighter
+		local report
 		if f and f.State then
 			-- Owner mode: also report this client's simulation of its fighter (server OwnerSync)
 			local aim = f.Aim
-			ctx.Remotes.CombatInput:FireServer(s.Seq, s.Move.X, s.Move.Z, ctx.Camera.Yaw, s.AimU, s.AimV, buttons,
-				f.State, f.Balance or 0, f.Block.Active == true, aim.U, aim.V, aim.VU, aim.VV, aim.Bind ~= nil, p.Ack, f.Sheathed == true)
-		else
-			ctx.Remotes.CombatInput:FireServer(s.Seq, s.Move.X, s.Move.Z, ctx.Camera.Yaw, s.AimU, s.AimV, buttons)
+			report = {
+				State = f.State, Balance = f.Balance or 0, Guard = f.Block.Active == true,
+				AimU = aim.U, AimV = aim.V, AimVU = aim.VU, AimVV = aim.VV,
+				Bound = aim.Bind ~= nil, Ack = p.Ack, Sheathed = f.Sheathed == true,
+			}
 		end
+		ctx.Remotes.CombatInput:FireServer(InputPacket.Encode(s.Seq, s.Move.X, s.Move.Z, ctx.Camera.Yaw, s.AimU, s.AimV, buttons, report))
 	end
 end
 
@@ -168,6 +172,12 @@ function InputController.Bind(ctx)
 	local model = ctx.Fighter
 	if not model or not model.Parent then
 		return nil
+	end
+	local p = ctx.Prediction
+	if p and p.Owner then
+		-- Owner mode: this client simulates the fighter itself
+		local f = p.Fighter
+		return f and f.Model == model and f.Aim and f.Aim.Bind or nil
 	end
 	local ut, lt = model:FindFirstChild("UpperTorso"), model:FindFirstChild("LowerTorso")
 	if ut and lt and lt:GetAttribute("S_State") ~= nil then
