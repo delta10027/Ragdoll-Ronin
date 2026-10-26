@@ -221,7 +221,7 @@ function BalanceController.Update(f, dt, inp)
 		end
 
 		-- controllable states follow intent
-		local canSword = f.Sword ~= nil and not f.Sheathed and caps.SwordArm > 0.05
+		local canSword = f.Sword ~= nil and not f.Sheathed and not f.DrawKind and caps.SwordArm > 0.05
 		local want
 		if inp.M2 and canSword then
 			want = "Blocking"

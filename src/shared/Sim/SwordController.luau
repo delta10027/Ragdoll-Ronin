@@ -39,6 +39,7 @@ local Config = require(Shared.Config)
 local Util = require(script.Parent.Util)
 local Runtime = require(script.Parent.Runtime)
 local BodyShape = require(script.Parent.BodyShape)
+local Draw = require(script.Parent.Draw)
 
 local SwordController = {}
 
@@ -211,7 +212,8 @@ end
 function SwordController.UpdateAim(f, dt, inp)
 	local now = Runtime.now()
 	local st = f.State
-	local swordOK = f.Sword ~= nil and not f.Sheathed and f.Caps.SwordArm > 0.05
+	Draw.Input(f, inp) -- 1: draw / sheathe (animated, Shared.Sim.Draw)
+	local swordOK = f.Sword ~= nil and not f.Sheathed and not f.DrawKind and f.Caps.SwordArm > 0.05
 	local mode = "Ready"
 	if swordOK and st == "Attacking" then
 		mode = "Attack"
@@ -351,7 +353,15 @@ function SwordController.UpdateAim(f, dt, inp)
 	aim.Edge = Util.rotateToward(cur, wantEdge, A.EdgeTurnRate * dt)
 	local X = Util.perpendicular(aim.Edge, dir, wantEdge)
 
-	f.SwordTargetCF = CFrame.fromMatrix(pos, X, dir, X:Cross(dir))
+	local target = CFrame.fromMatrix(pos, X, dir, X:Cross(dir))
+	if f.DrawKind then
+		-- drawing / sheathing: the scripted path (it runs along the scabbard, so no body clearance)
+		target = Draw.Pose(f, dt, target)
+		aim.Edge = target.RightVector
+	else
+		f.DrawPose = nil
+	end
+	f.SwordTargetCF = target
 end
 
 ------------------------------------------------------------------ bind (blocked attacks)
@@ -468,10 +478,10 @@ end
 -- (Stroke = nil: it may only meet other blades, see CombatResolver.Process).
 function SwordController.Track(f, dt, inp)
 	local atk = f.Attack
-	if not f.Sword or f.Sheathed then
+	if not f.Sword or f.Sheathed or f.DrawKind then
 		atk.Stroke = nil
 		atk.PrevBladeCF = nil
-		setPhase(f, f.Sword and "Sheathed" or "Unarmed")
+		setPhase(f, (not f.Sword and "Unarmed") or (f.DrawKind and "Drawing") or "Sheathed")
 		return nil
 	end
 	local cf = f.Sword.Blade.CFrame

@@ -304,12 +304,34 @@ Config.Kick = {
 	BlockedStaggerTime = 0.3, -- the kicker, bounced off the guard
 }
 
--- Sheathing (1): players spawn with the katana in its saya on the left hip
+-- Sheathing (1): players spawn with the katana in its saya, worn edge up through the obi on the
+-- left hip with the hilt angled forward across the belly, so the right hand can reach it
 Config.Sheath = {
 	StartSheathed = true, -- players' fighters (dummies always spawn with the sword drawn)
-	Mouth = Vector3.new(-0.9, 0.05, -0.5), -- scabbard mouth, pelvis space (unscaled; +X right, -Z forward)
-	BladeDir = Vector3.new(-0.12, -0.38, 0.92), -- the scabbard runs back and down from the mouth
+	Mouth = Vector3.new(-0.5, 0.1, -0.55), -- scabbard mouth, pelvis space (unscaled; +X right, -Z forward)
+	BladeDir = Vector3.new(-0.3, -0.35, 0.89), -- the scabbard runs back, down and out from the mouth
 	Color = Color3.fromRGB(28, 22, 24),
+}
+
+-- Drawing and sheathing are animated like an iaido draw (SwordController, Shared.Sim.Draw):
+--   draw     reach: the right hand crosses to the hilt, the left hand takes the scabbard mouth
+--              (thumb on the tsuba) and the torso turns left;
+--            pull:  the right hand draws the blade forward along the scabbard, edge up, while the
+--              left hand pulls the scabbard back (saya-biki) until the tip clears the mouth;
+--            swing: the blade swings forward into the guard in front of the body, the left hand
+--              leaves the scabbard for the hilt (two hands) and the scabbard settles back.
+--   sheathe  the reverse (noto): the blade turns edge up and brings its tip back to the mouth with
+--            the scabbard pulled back, slides home, the hands let go.
+Config.Draw = {
+	ReachTime = 0.28,
+	PullTime = 0.38,
+	SwingTime = 0.32,
+	AlignTime = 0.4, -- sheathe: tip to the mouth
+	InsertTime = 0.45, -- sheathe: slide home
+	ReleaseTime = 0.2, -- sheathe: hands back to the sides
+	Twist = 0.6, -- torso turn (radians, + = left) that brings the right shoulder to the hilt
+	SayaBiki = 0.9, -- studs the left hand pulls the scabbard back along itself
+	ClearMargin = 0.05, -- studs past the mouth the tip travels before the blade turns
 }
 
 -- Sound effects (server SoundFX). Put Roblox audio asset ids in Ids, as numbers or
