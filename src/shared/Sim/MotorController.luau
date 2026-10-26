@@ -17,6 +17,7 @@ local StateDefs = require(Shared.StateDefs)
 local Util = require(script.Parent.Util)
 local Runtime = require(script.Parent.Runtime)
 local BodyShape = require(script.Parent.BodyShape)
+local Spacing = require(script.Parent.Spacing)
 
 local MotorController = {}
 
@@ -372,17 +373,18 @@ local function uprightPose(f, dt)
 	local pose = {}
 	local st = f.State
 	local aim = f.Aim
-	local torsoYaw = 0
+	-- body twist from the sword pose (wind-up / follow-through, guard side): the waist turns by it
+	-- and the hips add Config.Aim.HipTwist of it (pelvis facing, see Apply); the neck turns the head
+	-- back to the front
+	local torsoYaw = aim and aim.Twist or 0
+	local twist = torsoYaw * (1 + Config.Aim.HipTwist)
 	local lean = rad(6)
 	if st == "Attacking" then
-		torsoYaw = -aim.U * 0.45
 		lean += rad(6) * math.clamp(0.5 - aim.V * 0.5, 0, 1)
-	elseif st == "Blocking" then
-		torsoYaw = -aim.U * 0.25
 	end
 	pose.Waist = CFrame.Angles(0, torsoYaw, 0) * CFrame.Angles(-lean, 0, 0)
-	pose.NeckBase = CFrame.Angles(0, -torsoYaw * 0.5, 0)
-	pose.NeckHead = CFrame.Angles(lean * 0.5, -torsoYaw * 0.5, 0)
+	pose.NeckBase = CFrame.Angles(0, -twist * 0.5, 0)
+	pose.NeckHead = CFrame.Angles(lean * 0.5, -twist * 0.5, 0)
 	if f.Caps.Kneeling then
 		kneelLegs(f, pose)
 	else
@@ -440,6 +442,9 @@ function MotorController.Apply(f, dt, inp)
 	local moveDir = StateDefs.Upright[st] and inp.Move or Vector3.zero
 	local speed = M.WalkSpeed * tone.Move * caps.Move * (caps.Kneeling and M.KneelSpeedMult or 1)
 	local vel = moveDir * speed
+	if StateDefs.Upright[st] then
+		vel = Spacing.Adjust(f, vel)
+	end
 	f.CommandedVelocity = vel
 
 	-- 1. joints
@@ -481,7 +486,8 @@ function MotorController.Apply(f, dt, inp)
 			leanCF = CFrame.fromAxisAngle(axis.Unit, rad(14))
 		end
 	end
-	setCF(f, Dr.Upright, "CFrame", leanCF * CFrame.Angles(0, f.FacingYaw, 0), 1, rad(0.5))
+	local hipTwist = StateDefs.Upright[st] and f.Aim and f.Aim.Twist * Config.Aim.HipTwist or 0
+	setCF(f, Dr.Upright, "CFrame", leanCF * CFrame.Angles(0, f.FacingYaw + hipTwist, 0), 1, rad(0.5))
 	local uprightTone = tone.Upright * (st == "Recovering" and r * Config.Recovery.UprightTorqueScale or 1)
 	setNum(f, Dr.Upright, "MaxTorque", D.PelvisTorquePerMass * f.TotalMass * uprightTone * caps.Stability, 5)
 

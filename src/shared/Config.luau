@@ -50,6 +50,8 @@ Config.Movement = {
 	OffBalanceSpeedMult = 0.45,
 	KneelSpeedMult = 0.22,
 	TurnRate = math.rad(540),
+	PersonalSpace = 5.6 * S, -- fighters cannot walk closer than this (pelvis to pelvis, see Sim.Spacing)
+	PersonalSpacePush = 6, -- 1/s: how firmly fighters inside that distance are eased apart
 	AttackTurnRate = math.rad(260),
 	StandHeight = 3.62 * S, -- pelvis centre above ground
 	KneelHeightFactor = 0.66,
@@ -124,63 +126,62 @@ Config.Aim = {
 	ReadyBlendRate = 10,
 	ClientSensitivity = 0.0042, -- disk radii per mouse pixel while M1/M2 held
 	CameraSensitivity = 0.0035, -- radians per mouse pixel otherwise
-	GripSpreadX = 0.95,
-	GripSpreadY = 0.85,
-	GripBaseY = -0.05,
-	GripDepth = 1.0,
-	ThrustDepth = 0.55,
-	BladeOutward = 1.25,
-	BladeLift = 0.2,
-	CrossBodyDepth = 0.3, -- extra forward reach when the sword hand crosses to the left
-	CrossBodySpread = 0.55, -- the sword hand travels less far to the left than to the right (reach)
 	-- Key poses: grip position (unscaled, upper-torso space: +X right, +Y up, -Z forward) and blade
 	-- direction. Idle: two-handed, hands low in front of the hips, blade angled up and forward.
 	ReadyGrip = Vector3.new(0.08, -0.75, -1.45),
 	ReadyBlade = Vector3.new(-0.08, 0.62, -0.78),
-	-- Windup: cursor pushed up past WindupStart draws the sword back over the head (hands above
-	-- the forehead, blade pointing back behind the head), so pulling the cursor down from there is
-	-- a full vertical cut. WindupPosLead > 1 lifts the hands before the blade rotates back over the
-	-- head so the blade clears it.
-	WindupStart = 0.45,
-	WindupPosLead = 1.3,
-	WindupGrip = Vector3.new(0.1, 2.3, -0.75),
-	WindupBlade = Vector3.new(0.05, 0.4, 0.92),
-	WindupSpreadX = 0.4, -- grip shift per unit of cursor u while wound up (diagonal windups)
-	WindupBladeOutward = 0.3,
-	-- Diagonal cuts: near a diagonal of the disk the attack pose blends toward these keys. The
-	-- upper ones raise the sword over that shoulder (Windup = edge pre-aimed at the coming cut), the
-	-- lower ones are the finish at the opposite hip, so dragging corner to corner is a full
-	-- shoulder-to-hip diagonal. Angle: degrees clockwise from straight up.
-	DiagonalWidth = 40, -- degrees either side of a diagonal over which its key blends in
-	DiagonalRimStart = 0.3, -- cursor radius where the diagonal keys start to take over
-	-- resting out at the rim (above the lower diagonals) the edge pre-aims at a cut back through the
-	-- centre, so horizontal and diagonal cuts start edge-first
-	RimPrepStart = 0.6,
-	DiagonalKeys = {
-		{ Angle = 45, Windup = true, Grip = Vector3.new(0.8, 1.5, -0.6), Blade = Vector3.new(0.3, 0.55, 0.78) }, -- over right shoulder
-		{ Angle = 315, Windup = true, Grip = Vector3.new(-0.35, 1.4, -0.85), Blade = Vector3.new(-0.3, 0.55, 0.78) }, -- over left shoulder
-		{ Angle = 225, Grip = Vector3.new(-0.15, -0.55, -1.1), Blade = Vector3.new(-0.45, -0.75, -0.48) }, -- finish at left hip
-		{ Angle = 135, Grip = Vector3.new(0.75, -0.75, -1.05), Blade = Vector3.new(0.45, -0.75, -0.5) }, -- finish at right hip
+	-- Attack (M1): every point out at the rim of the disk is a drawn-back or finished sword
+	-- position (AttackKeys, one per 45 degrees clockwise from straight up); the centre of the disk
+	-- is AttackCenter, blade straight ahead with the arms extended (a thrust). Between them the
+	-- blade turns from the rim key toward straight ahead, so dragging the cursor from one side of
+	-- the disk through the middle to the other is one cut, in the plane real katana cuts use:
+	--   top -> bottom            vertical cut from overhead
+	--   top right -> bottom left kesa-giri: from hasso (hands by the right shoulder, blade up and
+	--                            back) down across the body, finishing at the left hip with the
+	--                            blade out to the side
+	--   right -> left            horizontal cut: drawn back over the right shoulder with the torso
+	--                            and hips wound up, sweeping round to wrap over the left shoulder
+	-- (and every cut the other way). Each key also has a body twist (radians of waist yaw, + =
+	-- turned left; the hips turn HipTwist of it on top) and a windup weight: while held at a windup
+	-- key the edge already faces the coming cut back through the centre.
+	AttackRimFull = 0.9, -- cursor radius at which the rim key is reached
+	AttackPosLead = 1.3, -- > 1: hands reach the rim position before the blade finishes turning, so
+	-- drawing the cursor in from a windup first swings the blade over, then brings the hands through
+	RimPrepStart = 0.6, -- cursor radius where the windup edge pre-aim starts
+	HipTwist = 0.4, -- the hips turn this fraction of the body twist, on top of the waist
+	AttackCenter = { Grip = Vector3.new(0, 0.15, -1.55), Blade = Vector3.new(0, 0.12, -1) },
+	AttackKeys = {
+		{ Grip = Vector3.new(0.1, 2.3, -0.75), Blade = Vector3.new(0.05, 0.4, 0.92), Windup = 1, Twist = 0 }, -- overhead
+		{ Grip = Vector3.new(0.8, 1.15, -0.45), Blade = Vector3.new(0.4, 0.8, 0.45), Windup = 1, Twist = -0.4 }, -- hasso, right shoulder
+		{ Grip = Vector3.new(0.8, 0.6, -0.65), Blade = Vector3.new(0.85, 0.15, 0.5), Windup = 1, Twist = -0.65 }, -- wound up to the right
+		{ Grip = Vector3.new(0.25, -0.5, -1.4), Blade = Vector3.new(0.7, -0.25, -0.65), Windup = 0, Twist = -0.45 }, -- finish at the right hip
+		{ Grip = Vector3.new(0.1, -0.7, -1.3), Blade = Vector3.new(0, -0.6, -0.8), Windup = 0, Twist = 0 }, -- finish low in front
+		{ Grip = Vector3.new(-0.1, -0.5, -1.45), Blade = Vector3.new(-0.7, -0.25, -0.65), Windup = 0, Twist = 0.5 }, -- finish at the left hip
+		{ Grip = Vector3.new(-0.5, 0.6, -0.9), Blade = Vector3.new(-0.85, 0.15, 0.5), Windup = 1, Twist = 0.6 }, -- wound up to the left
+		{ Grip = Vector3.new(-0.45, 1.15, -0.65), Blade = Vector3.new(-0.4, 0.8, 0.45), Windup = 1, Twist = 0.35 }, -- hasso, left shoulder
 	},
 	-- Guard (M2): one key per 45 degrees clockwise from straight up, each held OUT beyond the body
 	-- on its side so a real swing meets the blade before it reaches the body. Near the disk centre
 	-- the guard blends into GuardCenter (flat across in front of the chin).
-	-- Up: flat across above the head, tip to the right (the left hand holds the pommel end, so it
-	-- has to be the hand further left). Sides: tip angled up and out past that shoulder. Every key
-	-- keeps both hands on the hilt. Edge: the roll of the blade, fixed per key and chosen for the
-	-- least arm strain, so moving the guard never spins the sword in the hands.
+	-- Up: flat across above the forehead, hands as far left as the right arm reaches and the torso
+	-- turned a little left, so the blade (not the hands) covers the head against a vertical cut.
+	-- Sides: blade upright beside the body, tip up, against horizontal and diagonal cuts; the upper
+	-- diagonals raise it with the tip leaning in over the head. The left hand holds the pommel end,
+	-- so it is always the lower / further-left hand. Edge: the roll of the blade, fixed per key and
+	-- chosen for the least arm strain, so moving the guard never spins the sword in the hands.
+	-- Twist: body twist as for attack keys (the torso turns toward the threatened side).
 	GuardRimStart = 0.3,
 	GuardRimFull = 0.85,
-	GuardCenter = { Grip = Vector3.new(-0.15, 1.15, -1.15), Blade = Vector3.new(0.98, 0.1, -0.15), Edge = Vector3.new(-0.13, 0.98, -0.18) },
+	GuardCenter = { Grip = Vector3.new(-0.15, 1.15, -1.15), Blade = Vector3.new(0.98, 0.1, -0.15), Edge = Vector3.new(-0.13, 0.98, -0.18), Twist = 0 },
 	GuardKeys = {
-		{ Grip = Vector3.new(-0.15, 2.15, -0.9), Blade = Vector3.new(0.98, 0.1, -0.15), Edge = Vector3.new(-0.13, 0.98, -0.18) }, -- up
-		{ Grip = Vector3.new(0.1, 1.2, -1.2), Blade = Vector3.new(0.9, 0.42, -0.15), Edge = Vector3.new(-0.44, 0.88, -0.16) }, -- up-right
-		{ Grip = Vector3.new(0.45, -0.35, -1.35), Blade = Vector3.new(0.75, 0.65, -0.15), Edge = Vector3.new(-0.64, 0.76, 0.13) }, -- right
-		{ Grip = Vector3.new(0.75, -0.45, -1.25), Blade = Vector3.new(0.45, -0.85, -0.25), Edge = Vector3.new(-0.89, -0.43, -0.15) }, -- down-right
-		{ Grip = Vector3.new(0.15, -0.7, -1.4), Blade = Vector3.new(-0.1, -0.97, -0.22), Edge = Vector3.new(-0.96, 0.15, -0.22) }, -- down
-		{ Grip = Vector3.new(-0.2, -0.5, -1.25), Blade = Vector3.new(-0.5, -0.82, -0.25), Edge = Vector3.new(-0.86, 0.46, 0.21) }, -- down-left
-		{ Grip = Vector3.new(-0.55, -0.25, -1.3), Blade = Vector3.new(-0.78, 0.6, -0.15), Edge = Vector3.new(-0.59, -0.8, -0.13) }, -- left
-		{ Grip = Vector3.new(-0.45, 0.6, -1.35), Blade = Vector3.new(-0.62, 0.76, -0.2), Edge = Vector3.new(-0.78, -0.63, 0.03) }, -- up-left
+		{ Grip = Vector3.new(-0.35, 2.1, -0.85), Blade = Vector3.new(0.95, 0.12, 0.2), Edge = Vector3.new(-0.12, 0.99, 0), Twist = 0.3 }, -- up
+		{ Grip = Vector3.new(0.5, 1.1, -1.2), Blade = Vector3.new(-0.45, 0.88, -0.15), Edge = Vector3.new(0.6, 0.3, -0.75), Twist = -0.2 }, -- up-right
+		{ Grip = Vector3.new(0.7, 0.35, -1.15), Blade = Vector3.new(0.12, 0.99, -0.05), Edge = Vector3.new(0.5, -0.1, -0.85), Twist = -0.3 }, -- right
+		{ Grip = Vector3.new(0.75, -0.45, -1.25), Blade = Vector3.new(0.45, -0.85, -0.25), Edge = Vector3.new(-0.89, -0.43, -0.15), Twist = -0.2 }, -- down-right
+		{ Grip = Vector3.new(0.15, -0.7, -1.4), Blade = Vector3.new(-0.1, -0.97, -0.22), Edge = Vector3.new(-0.96, 0.15, -0.22), Twist = 0 }, -- down
+		{ Grip = Vector3.new(-0.2, -0.5, -1.25), Blade = Vector3.new(-0.5, -0.82, -0.25), Edge = Vector3.new(-0.86, 0.46, 0.21), Twist = 0.2 }, -- down-left
+		{ Grip = Vector3.new(-0.75, 0.4, -1.3), Blade = Vector3.new(-0.12, 0.99, -0.05), Edge = Vector3.new(-0.6, 0, -0.8), Twist = 0.3 }, -- left
+		{ Grip = Vector3.new(-0.75, 1.0, -1.2), Blade = Vector3.new(0.5, 0.85, -0.15), Edge = Vector3.new(-0.6, 0.3, -0.75), Twist = 0.25 }, -- up-left
 	},
 }
 
