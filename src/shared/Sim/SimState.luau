@@ -85,6 +85,7 @@ field(UT, "LimbsCollide", function(f) return f.LimbsCollide end, function(f, v) 
 field(UT, "OffHandFree", function(f) return f.OffHandFree end, function(f, v) f.OffHandFree = v == true end)
 field(UT, "ArmStepR", function(f) return f.ArmAvoid and f.ArmAvoid.Right.Step end, function(f, v) f.ArmAvoid.Right.Step = v end)
 field(UT, "ArmStepL", function(f) return f.ArmAvoid and f.ArmAvoid.Left.Step end, function(f, v) f.ArmAvoid.Left.Step = v end)
+field(UT, "ArmRollR", function(f) return f.ArmAvoid and f.ArmAvoid.Right.Roll end, function(f, v) f.ArmAvoid.Right.Roll = v end)
 -- server-only inputs to the simulation
 field(UT, "TotalMass", function(f) return f.TotalMass end, function(f, v) f.TotalMass = v or 1 end)
 local CAP_KEYS = { "LegLeft", "LegRight", "LegSupport", "SwordArm", "OffArm", "Grip", "Strength", "Move", "Stability", "BalanceRegen", "BalanceMax", "Kneeling", "Incapacitated" }

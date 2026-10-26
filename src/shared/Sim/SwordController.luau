@@ -248,8 +248,26 @@ function SwordController.UpdateAim(f, dt, inp)
 	local k = math.min(1, A.Accel * dt)
 	aim.VU += (du - aim.VU) * k
 	aim.VV += (dv - aim.VV) * k
-	aim.U += aim.VU * dt
-	aim.V += aim.VV * dt
+	-- the cursor waits for the sword: when the physical blade lags far behind the pose the cursor
+	-- asks for (a very fast circle, or a blade stopped by a block), cursor motion that would add to
+	-- the lag slows and finally stops until the sword catches up (moving back toward the sword is
+	-- never held). Past 180 degrees of lag the hand's orientation drive would take the short way
+	-- round and swing the sword the wrong way (e.g. pointing down overhead).
+	local follow = 1
+	if mode ~= "Ready" and f.Sword and f.Sword.Blade and f.Parts.UpperTorso then
+		local pose = mode == "Guard" and guardPose or attackPose
+		local blade = f.Parts.UpperTorso.CFrame:VectorToObjectSpace(f.Sword.Blade.CFrame.UpVector)
+		local function lagAt(u, v)
+			local _, d = pose(u, v)
+			return math.acos(math.clamp(blade:Dot(d), -1, 1))
+		end
+		local lagNew = lagAt(aim.U + aim.VU * dt, aim.V + aim.VV * dt)
+		if lagNew > lagAt(aim.U, aim.V) then
+			follow = 1 - Util.smoothstep((lagNew - A.LagSlowStart) / (A.LagStop - A.LagSlowStart))
+		end
+	end
+	aim.U += aim.VU * dt * follow
+	aim.V += aim.VV * dt * follow
 	local r = math.sqrt(aim.U * aim.U + aim.V * aim.V)
 	if r > 1 then
 		aim.U, aim.V = aim.U / r, aim.V / r
