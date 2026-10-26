@@ -26,6 +26,7 @@ local Runtime = require(Shared.Sim.Runtime)
 local SimState = require(Shared.Sim.SimState)
 local StateMachine = require(Shared.Sim.StateMachine)
 local Registry = require(script.Parent.Registry)
+local Draw = require(Shared.Sim.Draw)
 
 local OwnerSync = {}
 
@@ -94,6 +95,10 @@ function OwnerSync.Report(f, r)
 		StateMachine.Mirror(f, r.State, { Until = now })
 	end
 	f.Balance = math.clamp(r.Balance, 0, Config.Balance.Max)
+	if f.Sword and r.Sheathed ~= (f.Sheathed == true) then
+		-- the owner drew or sheathed (its client moved the welds; take the parts where they are)
+		Draw.Attach(f, not r.Sheathed, false)
+	end
 	local aim = f.Aim
 	aim.U, aim.V, aim.VU, aim.VV = r.AimU, r.AimV, r.AimVU, r.AimVV
 	if not r.Bound then

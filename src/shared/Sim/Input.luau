@@ -19,6 +19,7 @@ function Input.Neutral()
 		M2 = false,
 		Kick = false, -- C (teep); a tap is held for a few frames so it is never missed
 		Crouch = false, -- CTRL held
+		Sheath = false, -- 1 (draw / sheathe), a tap held a few frames like the kick
 		Seq = 0,
 		LastPacket = 0,
 	}

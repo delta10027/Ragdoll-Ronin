@@ -25,6 +25,7 @@ local COLORS = {
 	Recoil = Color3.fromRGB(190, 120, 255),
 	Unarmed = Color3.fromRGB(140, 140, 140),
 	Sheathed = Color3.fromRGB(140, 140, 140),
+	Drawing = Color3.fromRGB(200, 200, 200),
 	Disabled = Color3.fromRGB(120, 120, 120),
 }
 local TRAIL = 6

@@ -271,10 +271,13 @@ function CharacterBuilder.Build(spawnCF, opts)
 	gripJoint.Part1 = sword.Handle
 	gripJoint.Parent = sword.Model
 	sword.GripJoint = gripJoint
-	sword.HandLocal = hand.CFrame:ToObjectSpace(sword.Handle.CFrame) -- where the hand holds it (SheathService)
+	-- where the hand holds it (drawing puts it back exactly here, SwordController.Attach)
+	sword.HandLocal = hand.CFrame:ToObjectSpace(sword.Handle.CFrame)
+	sword.Handle:SetAttribute("HandLocal", sword.HandLocal)
 
-	-- saya (scabbard) worn on the left hip, edge up, the mouth just in front of the hip and the
-	-- scabbard running back and down (Config.Sheath). The sheathed sword sits in it, welded to it.
+	-- saya (scabbard) on the left hip, edge up, the mouth in front of the hip and the scabbard
+	-- running back, down and out (Config.Sheath). It hangs on a Weld whose C0 the draw animates
+	-- (saya-biki: the left hand pulls it back along itself); the sheathed sword is welded into it.
 	do
 		local SH, SW = Config.Sheath, Config.Sword
 		local pelvis = parts.LowerTorso
@@ -282,21 +285,27 @@ function CharacterBuilder.Build(spawnCF, opts)
 		local e = (Vector3.yAxis - d * Vector3.yAxis:Dot(d)).Unit -- edge up
 		local rot = CFrame.fromMatrix(Vector3.zero, e, d, e:Cross(d))
 		local mouth = SH.Mouth * S
-		sword.SheathLocal = CFrame.new(mouth - d * (SW.HandleLength / 2 + SW.GuardThickness / 2)) * rot
 		local len = SW.BladeLength + 0.15
+		local sayaLocal = CFrame.new(mouth + d * (SW.GuardThickness / 2 + len / 2)) * rot -- pelvis space
+		-- the sheathed handle, relative to the saya: the tsuba at the mouth
+		local handleLocal = CFrame.new(mouth - d * (SW.HandleLength / 2 + SW.GuardThickness / 2)) * rot
 		local saya = Instance.new("Part")
 		saya.Name = "Saya"
 		saya.Size = Vector3.new(SW.BladeWidth * 1.6, len, SW.BladeThickness + 0.1)
-		saya.CFrame = pelvis.CFrame * CFrame.new(mouth + d * (SW.GuardThickness / 2 + len / 2)) * rot
+		saya.CFrame = pelvis.CFrame * sayaLocal
 		saya.Color = SH.Color
 		saya.Material = Enum.Material.SmoothPlastic
 		saya.CanCollide, saya.CanTouch, saya.CanQuery, saya.CastShadow = false, false, false, false
 		saya.Massless = true
 		saya.CollisionGroup = "RR_Sword"
+		saya:SetAttribute("BaseC0", sayaLocal)
+		saya:SetAttribute("InSaya", sayaLocal:ToObjectSpace(handleLocal))
 		saya.Parent = model
-		local w = Instance.new("WeldConstraint")
+		local w = Instance.new("Weld")
+		w.Name = "SayaWeld"
 		w.Part0 = pelvis
 		w.Part1 = saya
+		w.C0 = sayaLocal
 		w.Parent = saya
 		local sheathWeld = Instance.new("WeldConstraint")
 		sheathWeld.Name = "SheathWeld"
@@ -305,6 +314,9 @@ function CharacterBuilder.Build(spawnCF, opts)
 		sheathWeld.Enabled = false
 		sheathWeld.Parent = saya
 		sword.Saya = saya
+		sword.SayaWeld = w
+		sword.SayaBase = sayaLocal
+		sword.InSaya = sayaLocal:ToObjectSpace(handleLocal)
 		sword.SheathWeld = sheathWeld
 	end
 

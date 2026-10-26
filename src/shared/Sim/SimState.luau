@@ -113,7 +113,11 @@ field(UT, "ArmRollR", function(f) return f.ArmState and f.ArmState.Roll end, fun
 field(UT, "ArmSwivelL", function(f) return f.ArmState and f.ArmState.SwivelL end, function(f, v) f.ArmState.SwivelL = v or 0 end)
 -- server-only inputs to the simulation
 field(UT, "TotalMass", function(f) return f.TotalMass end, function(f, v) f.TotalMass = v or 1 end, true)
-field(UT, "Sheathed", function(f) return f.Sheathed == true end, function(f, v) f.Sheathed = v == true end, true)
+-- drawing / sheathing (Sim.Draw): where the sword is, the running animation and its time
+field(UT, "Sheathed", function(f) return f.Sheathed == true end, function(f, v) f.Sheathed = v == true end)
+field(UT, "DrawKind", function(f) return f.DrawKind end, function(f, v) f.DrawKind = v end)
+field(UT, "DrawT", function(f) return f.DrawT end, function(f, v) f.DrawT = v or 0 end)
+field(UT, "SheathHeld", function(f) return f.SheathHeld end, function(f, v) f.SheathHeld = v == true end)
 local CAP_KEYS = { "LegLeft", "LegRight", "LegSupport", "SwordArm", "OffArm", "Grip", "Strength", "Move", "Stability", "BalanceRegen", "BalanceMax", "Kneeling", "Incapacitated" }
 for _, key in ipairs(CAP_KEYS) do
 	field(UT, "Cap_" .. key, function(f) return f.Caps[key] end, function(f, v) f.Caps[key] = v end, true)
@@ -268,12 +272,20 @@ function SimState.BuildClient(model, player)
 	local sword
 	local katana = model:FindFirstChild("Katana")
 	if katana and katana:FindFirstChild("Handle") and katana:FindFirstChild("Blade") then
+		local saya = model:FindFirstChild("Saya")
 		sword = {
 			Model = katana,
 			Handle = katana.Handle,
 			Blade = katana.Blade,
 			ParryZone = katana:FindFirstChild("ParryZone"),
 			Collider = katana:FindFirstChild("BladeCollider"),
+			GripJoint = katana:FindFirstChild("GripJoint"),
+			HandLocal = katana.Handle:GetAttribute("HandLocal"),
+			Saya = saya,
+			SayaWeld = saya and saya:FindFirstChild("SayaWeld"),
+			SheathWeld = saya and saya:FindFirstChild("SheathWeld"),
+			SayaBase = saya and saya:GetAttribute("BaseC0"),
+			InSaya = saya and saya:GetAttribute("InSaya"),
 		}
 	end
 	return {

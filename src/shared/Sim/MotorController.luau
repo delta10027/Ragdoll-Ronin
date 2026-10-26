@@ -468,7 +468,8 @@ local function offHandTarget(f)
 end
 
 local function twoHanded(f)
-	return f.Sword ~= nil and not f.Sheathed and f.Drives.OffPos ~= nil and f.Caps.OffArm > 0.2 and StateDefs.Upright[f.State] == true
+	return f.Sword ~= nil and not f.Sheathed and (not f.DrawPose or f.DrawPose.TwoHand)
+		and f.Drives.OffPos ~= nil and f.Caps.OffArm > 0.2 and StateDefs.Upright[f.State] == true
 		and f.SwordTargetCF ~= nil and not f.OffHandFree
 end
 
@@ -489,13 +490,16 @@ local function solveArms(f, dt)
 	local out = {}
 	f.ArmSolution = out
 	f.SwordHoldCF = nil
-	if f.Sword and not f.Sheathed and f.Joints.RightShoulder and not f.Joints.RightShoulder.Severed and f.SwordTargetCF then
+	-- (while drawing, the right hand also works a sheathed sword: it reaches for the hilt)
+	if f.Sword and (not f.Sheathed or f.DrawPose) and f.Joints.RightShoulder and not f.Joints.RightShoulder.Severed and f.SwordTargetCF then
 		local rot, flex, wristRot, reached = solveSwordArm(st, f.SwordTargetCF, dt)
 		out.RightShoulder, out.RightElbow, out.RightWrist = rot, flex, wristRot
 		f.SwordHoldCF = reached
 	end
 	updateOffHandGrip(f)
-	if twoHanded(f) then
+	if f.DrawPose and f.DrawPose.Left and f.Joints.LeftShoulder and not f.Joints.LeftShoulder.Severed then
+		out.LeftShoulder, out.LeftElbow = solveOffArm(st, f.DrawPose.Left, dt) -- holding the scabbard
+	elseif twoHanded(f) then
 		out.LeftShoulder, out.LeftElbow = solveOffArm(st, offHandTarget(f), dt)
 	end
 end
@@ -723,7 +727,7 @@ function MotorController.Apply(f, dt, inp)
 	-- 5. hands
 	if Dr.HandPos and Dr.HandOri then
 		local k = 0
-		if f.Sword and not f.Sheathed and f.SwordTargetCF then
+		if f.Sword and (not f.Sheathed or f.DrawPose) and f.SwordTargetCF then
 			k = armTone * caps.SwordArm * caps.Grip
 			if Runtime.now() < f.Attack.RecoilUntil then
 				k *= Config.Combat.RecoilHandScale
@@ -735,6 +739,12 @@ function MotorController.Apply(f, dt, inp)
 		setNum(f, Dr.HandPos, "MaxForce", D.HandForce * k, D.HandForce * 0.01)
 		setNum(f, Dr.HandOri, "MaxTorque", D.HandTorque * k, D.HandTorque * 0.01)
 		setNum(f, Dr.HandPos, "MaxVelocity", D.HandMaxVelocity * (0.6 + 0.4 * caps.SwordArm), 0.5)
+	end
+	-- scabbard: the left hand pulls it back along itself while drawing / sheathing (saya-biki)
+	local sw = f.Sword
+	if sw and sw.SayaWeld and sw.SayaBase and sw.SayaWeld.Parent then
+		local biki = f.DrawPose and f.DrawPose.Biki or 0
+		setCF(f, sw.SayaWeld, "C0", CFrame.new(sw.SayaBase.UpVector * biki) * sw.SayaBase, 0.002, rad(0.3))
 	end
 	if Dr.OffPos then
 		setNum(f, Dr.OffPos, "MaxForce", twoHanded(f) and D.OffHandForce * armTone * caps.OffArm or 0, 5)

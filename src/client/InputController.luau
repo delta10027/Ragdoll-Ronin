@@ -9,8 +9,9 @@
 	  * releasing both: the cursor relaxes back to the ready stance (the server does the same)
 	  * C: teep (push kick). A tap is held for KICK_HOLD seconds so the simulation always sees it.
 	  * CTRL (held): crouch
-	  * 1: draw / sheathe the sword (CombatAction "Sheath")
-	Packet: seq, moveX, moveZ, yaw, aimU, aimV, buttons (bit0 = M1, bit1 = M2, bit2 = kick, bit3 = crouch)
+	  * 1: draw / sheathe the sword (animated, Shared.Sim.Draw); a tap held like the kick
+	Packet: seq, moveX, moveZ, yaw, aimU, aimV, buttons (bit0 = M1, bit1 = M2, bit2 = kick, bit3 = crouch,
+	  bit4 = draw/sheathe)
 ]]
 local UserInputService = game:GetService("UserInputService")
 local GuiService = game:GetService("GuiService")
@@ -35,6 +36,8 @@ function InputController.Init(ctx)
 		Kick = false,
 		KickUntil = 0,
 		Crouch = false,
+		Sheath = false,
+		SheathUntil = 0,
 		Move = Vector3.zero,
 		History = {},
 		Seq = 0,
@@ -62,7 +65,7 @@ function InputController.Init(ctx)
 		elseif io.KeyCode == Enum.KeyCode.C then
 			s.KickUntil = os.clock() + KICK_HOLD
 		elseif io.KeyCode == Enum.KeyCode.One then
-			ctx.Remotes.CombatAction:FireServer("Sheath")
+			s.SheathUntil = os.clock() + KICK_HOLD
 		elseif io.KeyCode == Enum.KeyCode.V then
 			CameraController.ToggleFront(ctx)
 		end
@@ -88,6 +91,7 @@ function InputController.Update(ctx, dt)
 	end
 
 	s.Kick = not blocked and os.clock() < s.KickUntil
+	s.Sheath = not blocked and os.clock() < s.SheathUntil
 	s.Crouch = not blocked and (UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.RightControl))
 	local delta = blocked and Vector2.zero or UserInputService:GetMouseDelta()
 	if s.M1 or s.M2 then
@@ -129,12 +133,12 @@ function InputController.Update(ctx, dt)
 	-- server authority: intent goes through InputActions every frame (predicted locally, replayed
 	-- on the server) instead of the RemoteEvent
 	if Runtime.ServerAuthority then
-		SimInput.Fire(ctx.Player, s.Move, ctx.Camera.Yaw, s.AimU, s.AimV, s.M1, s.M2, s.Kick, s.Crouch)
+		SimInput.Fire(ctx.Player, s.Move, ctx.Camera.Yaw, s.AimU, s.AimV, s.M1, s.M2, s.Kick, s.Crouch, s.Sheath)
 		return
 	end
 
 	-- a button press/release goes out immediately instead of waiting for the next send slot
-	local buttons = (s.M1 and 1 or 0) + (s.M2 and 2 or 0) + (s.Kick and 4 or 0) + (s.Crouch and 8 or 0)
+	local buttons = (s.M1 and 1 or 0) + (s.M2 and 2 or 0) + (s.Kick and 4 or 0) + (s.Crouch and 8 or 0) + (s.Sheath and 16 or 0)
 	if buttons ~= s.LastButtons or now - s.LastSend >= 1 / Config.Network.ClientSendRate then
 		s.LastButtons = buttons
 		s.LastSend = now
@@ -145,7 +149,7 @@ function InputController.Update(ctx, dt)
 			-- Owner mode: also report this client's simulation of its fighter (server OwnerSync)
 			local aim = f.Aim
 			ctx.Remotes.CombatInput:FireServer(s.Seq, s.Move.X, s.Move.Z, ctx.Camera.Yaw, s.AimU, s.AimV, buttons,
-				f.State, f.Balance or 0, f.Block.Active == true, aim.U, aim.V, aim.VU, aim.VV, aim.Bind ~= nil, p.Ack)
+				f.State, f.Balance or 0, f.Block.Active == true, aim.U, aim.V, aim.VU, aim.VV, aim.Bind ~= nil, p.Ack, f.Sheathed == true)
 		else
 			ctx.Remotes.CombatInput:FireServer(s.Seq, s.Move.X, s.Move.Z, ctx.Camera.Yaw, s.AimU, s.AimV, buttons)
 		end
