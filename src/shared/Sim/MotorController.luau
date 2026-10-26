@@ -374,52 +374,120 @@ local function solveOffArm(st, target, dt)
 end
 
 ------------------------------------------------------------------ poses
-local function hangArms(pose, side)
+-- An arm not holding anything hangs at the side; walking, it swings opposite to the leg on its
+-- side (f.GaitArm, set by standLegs: + = forward), the elbow bending more as it comes forward
+local function hangArms(pose, side, f)
 	local s = side == "Right" and 1 or -1
-	pose[side .. "Shoulder"] = CFrame.Angles(rad(8), 0, s * rad(6))
-	pose[side .. "Elbow"] = rad(20)
+	local ga = f and f.GaitArm
+	local swing, run = ga and ga[side] or 0, ga and ga.Run or 0
+	pose[side .. "Shoulder"] = CFrame.Angles(rad(8) + M.ArmSwing * swing, 0, s * rad(6 + 4 * run))
+	pose[side .. "Elbow"] = rad(20) + M.ArmRunElbow * run + M.ArmSwingElbow * math.max(0, swing)
 end
 
--- Gait is driven by the COMMANDED velocity: driving it from actual velocity lets a shove start
--- the stepping cycle, which then kicks the ground and sustains itself.
+-- thigh pitch (forward +) and knee bend that put the ankle `fwd` ahead of and `depth` below the hip
+local function legIK(fwd, depth)
+	local T, Sh = M.ThighLength, M.ShinLength
+	local d = math.clamp(math.sqrt(fwd * fwd + depth * depth), math.abs(T - Sh) + 0.05, (T + Sh) * 0.999)
+	local knee = math.pi - math.acos(math.clamp((T * T + Sh * Sh - d * d) / (2 * T * Sh), -1, 1))
+	local lead = math.acos(math.clamp((T * T + d * d - Sh * Sh) / (2 * T * d), -1, 1))
+	return math.atan2(fwd, depth) + lead, knee
+end
+
+local LEG_MAX = M.ThighLength + M.ShinLength
+local FOOT_BALL = 0.6 * S -- ankle to the ball of the foot, along the sole
+local TWO_PI = 2 * math.pi
+
+-- Walk cycle (Config.Movement, gait). Gait is driven by the COMMANDED velocity: driving it from
+-- actual velocity lets a shove start the stepping cycle, which then kicks the ground and sustains
+-- itself. Each leg: a stance phase (duty) with the foot planted, travelling back under the hip as
+-- fast as the body moves forward, then a swing phase that lifts it forward again; thigh and knee
+-- come from IK to that foot point, so the feet stay put on the ground instead of skating.
 local function standLegs(f, dt, pose)
 	local pelvis = f.Parts.LowerTorso
 	local vel = f.CommandedVelocity or Vector3.zero
 	local speed = vel.Magnitude
 	local frac = math.clamp(speed / M.WalkSpeed, 0, 1)
 	local g = f.Gait
+	-- stride (full cycle) ~ speed ^ 0.7: step length and cadence both grow with speed
+	local want = speed > 0.6 and M.StrideMax * frac ^ M.StrideExponent or 0
+	g.Stride = (g.Stride or 0) + (want - (g.Stride or 0)) * math.min(1, M.GaitBlendRate * dt)
+	local stride = g.Stride
 	if speed > 0.6 then
-		g.Phase = (g.Phase + dt * speed / M.StrideLength * 2 * math.pi) % (2 * math.pi)
+		g.Phase = (g.Phase + dt * speed / math.max(stride, M.StrideMax * 0.3) * TWO_PI) % TWO_PI
 	end
+	local amp = math.clamp(stride / M.StrideMax, 0, 1) -- how far into the walk the legs are
+	-- the faster the gait, the lower the body rides (more knee at mid stance), and a planted foot
+	-- may only travel as far as the leg reaches from that height: at speed the foot is down for a
+	-- shorter part of the cycle (a run's flight phase) instead of skating
+	local walkDepth = LEG_MAX * math.cos((M.StanceKneeBend + M.GaitKneeDip * amp) / 2)
+	local reachX = math.sqrt(math.max(0, (LEG_MAX * M.GaitReach) ^ 2 - walkDepth * walkDepth))
+	local duty = M.DutyWalk + (M.DutyRun - M.DutyWalk) * frac
+	if stride > 1e-3 then
+		duty = math.min(duty, 2 * reachX / stride)
+	end
+	local X = duty * stride / 2 -- foot ahead of / behind the hip at the ends of the stance
+	local lift = (M.SwingLift + (M.SwingLiftRun - M.SwingLift) * frac * frac) * math.min(1, amp * 2)
+
 	local lv = pelvis.CFrame:VectorToObjectSpace(vel)
 	local m = Util.unit(Vector3.new(lv.X, 0, lv.Z), Vector3.new(0, 0, -1))
 	if EXACT then
 		local a = quantize(math.atan2(m.X, -m.Z), GAIT_ANGLE_STEP)
 		m = Vector3.new(math.sin(a), 0, -math.cos(a))
 	end
-	local axis = Vector3.new(-m.Z, 0, m.X) -- rotating the leg about this swings it toward m
-	local fwd = -m.Z
-	-- knee bend that puts the feet on the ground at the pelvis' ACTUAL height: a crouch, or a body
-	-- pushed down (a heavy cut leaning on the guard) bends the knees instead of sinking the legs
-	-- into the ground (upright limbs do not collide, so nothing else would stop them)
+	-- hip to sole at the pelvis' ACTUAL height: a crouch, or a body pushed down (a heavy cut leaning
+	-- on the guard) bends the knees instead of sinking the legs into the ground (upright limbs do
+	-- not collide, so nothing else would stop them). Never straighter than StanceKneeBend, never
+	-- bent past 130 degrees.
 	local height = f.Ground and f.Ground.Height or M.StandHeight
-	local reach = (height - M.HipDrop - M.AnkleToSole) / (M.ThighLength + M.ShinLength)
-	local stanceKnee = math.max(M.StanceKneeBend, 2 * math.acos(math.clamp(reach, 0.2, 1)))
-	stanceKnee = math.min(stanceKnee, rad(130))
+	local depth = math.clamp(height - M.HipDrop - M.AnkleToSole, LEG_MAX * math.cos(rad(65)), LEG_MAX * math.cos(M.StanceKneeBend / 2))
 	if EXACT then
-		stanceKnee = quantize(stanceKnee, rad(1)) -- (physics height differs slightly on a predicting client)
+		depth = quantize(depth, 0.02) -- (physics height differs slightly on a predicting client)
 	end
+
+	local legs, footFwd = {}, {}
 	for _, side in ipairs({ "Left", "Right" }) do
-		local ph = g.Phase + (side == "Right" and math.pi or 0)
-		local swing = M.GaitHipAmplitude * frac * math.sin(ph)
-		local knee = stanceKnee + M.GaitKneeAmplitude * frac * math.max(0, math.cos(ph))
-		local stancePitch = (side == "Left" and rad(10) or rad(-8)) * (1 - frac)
+		local u = ((g.Phase + (side == "Right" and math.pi or 0)) / TWO_PI) % 1
+		local x, up, toe
+		if u < duty then
+			-- stance: heel strike (toes still up) -> foot flat -> heel rises for the push-off
+			local t = u / duty
+			local push = rad(22) * Util.smoothstep((t - 0.7) / 0.3) * amp
+			-- (the heel lifts on the ball of the foot, so the ankle rises with the push-off)
+			x, up = X * (1 - 2 * t), FOOT_BALL * math.sin(push)
+			toe = rad(12) * math.max(0, 1 - t / 0.15) - push / math.max(amp, 1e-3)
+		else
+			-- swing: the foot comes forward on an arc, toes down off the push, then up for the heel strike
+			local w = (u - duty) / (1 - duty)
+			x = -X + 2 * X * (1 - math.cos(math.pi * w)) / 2
+			up = lift * math.sin(math.pi * math.min(1, w * 1.15)) -- (peak clearance a little early)
+			toe = -rad(22) * (1 - Util.smoothstep(w / 0.4)) + rad(12) * Util.smoothstep((w - 0.5) / 0.5)
+		end
+		toe *= amp
+		-- standing still the feet rest in a slight fighting stagger (left ahead)
+		local stagger = (side == "Left" and rad(10) or rad(-8)) * (1 - amp)
 		local splay = (side == "Right" and 1 or -1) * rad(4)
-		local thighPitch = knee * 0.5 + stancePitch
-		pose[side .. "Hip"] = CFrame.fromAxisAngle(axis, swing) * CFrame.Angles(thighPitch, 0, splay)
-		pose[side .. "Knee"] = knee
-		pose[side .. "Ankle"] = CFrame.Angles(knee - thighPitch - swing * fwd, 0, -splay)
+		local fwd = x * -m.Z + depth * math.tan(stagger)
+		local lat = x * m.X
+		local down = depth - up
+		local roll = math.atan2(lat, down) -- sideways steps come from the hip, the knee only bends forward
+		local thigh, knee = legIK(fwd, math.sqrt(down * down + lat * lat))
+		legs[side] = { thigh, knee, toe, splay, roll }
+		footFwd[side] = X > 1e-3 and math.clamp(fwd / X, -1, 1) * amp or 0
 	end
+
+	-- the pelvis turns with the stepping leg (left foot ahead: left hip ahead; the hips turn the
+	-- feet back to the front), the arms swing against the legs, the body rises over the standing
+	-- leg and dips as the weight changes feet
+	f.GaitYaw = -M.GaitPelvisYaw * 0.5 * (footFwd.Left - footFwd.Right)
+	for side, l in pairs(legs) do
+		local thigh, knee, toe, splay, roll = l[1], l[2], l[3], l[4], l[5]
+		pose[side .. "Hip"] = CFrame.Angles(0, -f.GaitYaw, roll) * CFrame.Angles(thigh, 0, splay)
+		pose[side .. "Knee"] = knee
+		pose[side .. "Ankle"] = CFrame.Angles(knee - thigh + toe, 0, -splay - roll)
+	end
+	f.GaitArm = { Left = -footFwd.Left, Right = -footFwd.Right, Run = frac * frac * amp }
+	f.GaitBob = (walkDepth - LEG_MAX * math.cos(M.StanceKneeBend / 2))
+		+ M.GaitBob * amp * (1 - frac) * math.cos(2 * TWO_PI * (((g.Phase / TWO_PI) % 1) - duty / 2))
 end
 
 local function kneelLegs(f, pose)
@@ -510,12 +578,12 @@ local function armPose(f, pose)
 	if sol.RightShoulder then
 		pose.RightShoulder, pose.RightElbow, pose.RightWrist = sol.RightShoulder, sol.RightElbow, sol.RightWrist
 	elseif not pose.RightShoulder then
-		hangArms(pose, "Right")
+		hangArms(pose, "Right", f)
 	end
 	if sol.LeftShoulder then
 		pose.LeftShoulder, pose.LeftElbow = sol.LeftShoulder, sol.LeftElbow
 	elseif not pose.LeftShoulder then
-		hangArms(pose, "Left")
+		hangArms(pose, "Left", f)
 	end
 end
 
@@ -552,6 +620,12 @@ local function uprightPose(f, dt)
 	if st == "Attacking" then
 		lean += rad(6) * math.clamp(0.5 - aim.V * 0.5, 0, 1)
 	end
+	local cv = f.CommandedVelocity
+	if cv then
+		-- leaning into a fast walk
+		local ahead = cv:Dot(Vector3.new(-math.sin(f.FacingYaw), 0, -math.cos(f.FacingYaw)))
+		lean += M.GaitLean * math.clamp(ahead / M.WalkSpeed, 0, 1)
+	end
 	pose.Waist = CFrame.Angles(0, torsoYaw, 0) * CFrame.Angles(-lean, 0, 0)
 	pose.NeckBase = CFrame.Angles(0, -twist * 0.5, 0)
 	pose.NeckHead = CFrame.Angles(lean * 0.5, -twist * 0.5, 0)
@@ -559,6 +633,14 @@ local function uprightPose(f, dt)
 		kneelLegs(f, pose)
 	else
 		standLegs(f, dt, pose)
+	end
+	if f.GaitYaw then
+		-- the shoulders turn against the pelvis (with the arm swing; holding the sword they stay
+		-- square to the front) and the head keeps looking ahead
+		local free = (not f.Sword or (f.Sheathed and not f.DrawPose)) and 1 or 0
+		local shoulders = -f.GaitYaw * (M.GaitShoulderYaw / M.GaitPelvisYaw) * free
+		pose.Waist = CFrame.Angles(0, shoulders - f.GaitYaw, 0) * pose.Waist
+		pose.NeckBase = CFrame.Angles(0, -shoulders, 0) * pose.NeckBase
 	end
 	if st == "Kicking" then
 		-- teep: blend the stance into the kick leg pose as the knee comes up (Sim.Kick)
@@ -594,6 +676,7 @@ end
 
 function MotorController.ComputePose(f, dt)
 	local st = f.State
+	f.GaitYaw, f.GaitArm, f.GaitBob = nil, nil, nil -- (standLegs sets them while standing)
 	if StateDefs.Upright[st] then
 		return uprightPose(f, dt)
 	end
@@ -714,7 +797,7 @@ function MotorController.Apply(f, dt, inp)
 		leanCF = CFrame.fromAxisAngle(right, -rad(Config.Bow.Angle * Config.Bow.HipShare) * Bow.Amount(f))
 	end
 	local hipTwist = StateDefs.Upright[st] and f.Aim and f.Aim.Twist * Config.Aim.HipTwist or 0
-	setCF(f, Dr.Upright, "CFrame", leanCF * CFrame.Angles(0, f.FacingYaw + hipTwist, 0), 1, rad(0.5))
+	setCF(f, Dr.Upright, "CFrame", leanCF * CFrame.Angles(0, f.FacingYaw + hipTwist + (f.GaitYaw or 0), 0), 1, rad(0.5))
 	local uprightTone = tone.Upright * (st == "Recovering" and r * Config.Recovery.UprightTorqueScale or 1)
 	setNum(f, Dr.Upright, "MaxTorque", D.PelvisTorquePerMass * f.TotalMass * uprightTone * caps.Stability, 5)
 
@@ -726,7 +809,7 @@ function MotorController.Apply(f, dt, inp)
 	-- 4. support (spring-damper toward stand/kneel height, scaled by the recovery ramp)
 	local force = 0
 	if tone.Support > 0 and f.Ground then
-		local target = f.TargetHeight
+		local target = f.TargetHeight + (f.GaitBob or 0)
 		if st == "Recovering" then
 			target = (f.StateData.StartHeight or target) + (target - (f.StateData.StartHeight or target)) * Util.smoothstep(r)
 		end

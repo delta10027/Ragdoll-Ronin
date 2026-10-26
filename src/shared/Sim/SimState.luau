@@ -60,6 +60,7 @@ field(LT, "Attempts", function(f) return f.Recovery.Attempts end, function(f, v)
 field(LT, "RecoverRequested", function(f) return f.RecoverRequested end, function(f, v) f.RecoverRequested = v == true end)
 field(LT, "FacingYaw", function(f) return f.FacingYaw end, function(f, v) f.FacingYaw = v end)
 field(LT, "GaitPhase", function(f) return f.Gait.Phase end, function(f, v) f.Gait.Phase = v or 0 end)
+field(LT, "GaitStride", function(f) return f.Gait.Stride end, function(f, v) f.Gait.Stride = v or 0 end)
 field(LT, "Dead", function(f) return f.Dead end, function(f, v) f.Dead = v == true end)
 -- StateData (the per-state scratch table)
 for _, key in ipairs({ "Until", "FaceDown", "R", "StartHeight", "Yaw", "Stable", "Attempt", "Wait" }) do
@@ -308,7 +309,7 @@ function SimState.BuildClient(model, player)
 		SegFactor = {},
 		StateData = {},
 		StateHistory = {},
-		Gait = { Phase = 0 },
+		Gait = { Phase = 0, Stride = 0 },
 		Recovery = { Attempts = 0 },
 		Aim = { U = Config.Aim.ReadyU, V = Config.Aim.ReadyV, VU = 0, VV = 0, Edge = Vector3.new(0, -1, 0), Guard = 0, Ready = 1 },
 		Attack = { Phase = "Ready", RecoilUntil = 0, SegmentHitTimes = {} },
