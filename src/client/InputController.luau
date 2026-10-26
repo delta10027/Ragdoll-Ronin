@@ -48,6 +48,8 @@ function InputController.Init(ctx)
 			s.PressTime = os.clock()
 		elseif io.KeyCode == Enum.KeyCode.Space then
 			ctx.Remotes.CombatAction:FireServer("Recover")
+		elseif io.KeyCode == Enum.KeyCode.V then
+			CameraController.ToggleFront(ctx)
 		end
 	end)
 	UserInputService.InputEnded:Connect(function(io)
