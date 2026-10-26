@@ -99,6 +99,11 @@ Config.Drives = {
 	HandTorque = 1800,
 	HandAngResponsiveness = 60,
 	HandMaxAngularVelocity = 40,
+	-- the sword target turns toward the requested pose at most this fast (rad/s): blade direction,
+	-- then roll about the blade. Below what the hand can follow, so the hand drive never ends up
+	-- half a turn behind and swinging the wrong way round.
+	HandTurnRate = 20,
+	HandRollRate = 40,
 	OffHandForce = 900,
 	OffHandResponsiveness = 45,
 	-- Drive targets are only rewritten when they change by more than this (limits replication churn)
@@ -132,8 +137,8 @@ Config.Aim = {
 	Accel = 70, -- inertia of the controller cursor (1/s)
 	EdgeTurnRate = math.rad(1600),
 	EdgeMinSpeed = 0.5,
-	LagSlowStart = math.rad(60), -- physical blade this far behind the cursor's pose: the cursor slows...
-	LagStop = math.rad(120), -- ...and stops here until the sword catches up (see SwordController.UpdateAim)
+	LagSlowStart = math.rad(45), -- sword target this far behind the cursor's pose: the cursor slows...
+	LagStop = math.rad(90), -- ...and stops here until the target catches up (see SwordController.UpdateAim)
 	GuardBlendRate = 20,
 	ReadyBlendRate = 10,
 	ClientSensitivity = 0.0042, -- disk radii per mouse pixel while M1/M2 held

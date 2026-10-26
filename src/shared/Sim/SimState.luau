@@ -72,6 +72,9 @@ field(UT, "AimVV", function(f) return f.Aim.VV end, function(f, v) f.Aim.VV = v 
 field(UT, "AimGuard", function(f) return f.Aim.Guard end, function(f, v) f.Aim.Guard = v end)
 field(UT, "AimReady", function(f) return f.Aim.Ready end, function(f, v) f.Aim.Ready = v end)
 vecField(UT, "AimEdge", function(f) return f.Aim.Edge end, function(f, v) f.Aim.Edge = v or Vector3.new(0, -1, 0) end)
+-- speed-limited sword target (MotorController.limitTurn): blade direction and edge
+vecField(UT, "SwordAimDir", function(f) return f.SwordAimDir end, function(f, v) f.SwordAimDir = v end)
+vecField(UT, "SwordAimEdge", function(f) return f.SwordAimEdge end, function(f, v) f.SwordAimEdge = v end)
 field(UT, "BlockActive", function(f) return f.Block.Active end, function(f, v) f.Block.Active = v == true end)
 field(UT, "BlockStart", function(f) return f.Block.StartTime end, function(f, v) f.Block.StartTime = v or 0 end)
 field(UT, "ReleaseTime", function(f) return f.Attack.ReleaseTime end, function(f, v) f.Attack.ReleaseTime = v end)

@@ -240,6 +240,49 @@ local function clampSwingTwist(r, cone, twist)
 	return CFrame.fromAxisAngle(axis, math.min(swing, cone)) * CFrame.fromAxisAngle(Vector3.yAxis, -math.clamp(t, -twist, twist))
 end
 
+-- Joint drives always turn the short way, but the shoulder (+-110 deg) and wrist (+-165 deg) twist
+-- ranges do not include +-180: going from one end of the range to the other the short way runs into
+-- the limit, and the drive then pushes into it and stays there (the arm stays twisted, the hands stay
+-- flipped). So while the target twist is far from the joint's actual twist, the drive is given an
+-- intermediate target that moves the twist at most TWIST_STEP toward it, through the allowed range.
+local TWIST_STEP = rad(60)
+local TWIST_WALK_MIN = 90 -- degrees of twist range from which a joint is walked like this
+local function walkTwist(f, j, target)
+	local pp, cp = f.Parts[j.ParentName], f.Parts[j.ChildName]
+	if not pp or not cp then
+		return target
+	end
+	local _, now = swingTwist(pp.CFrame:ToObjectSpace(cp.CFrame).Rotation)
+	local b = target:VectorToWorldSpace(LIMB_AXIS)
+	local swing = math.acos(math.clamp(LIMB_AXIS:Dot(b), -1, 1))
+	local axis = LIMB_AXIS:Cross(b)
+	axis = axis.Magnitude < 1e-6 and Vector3.xAxis or axis.Unit
+	local swingCF = CFrame.fromAxisAngle(axis, swing)
+	local x = (swingCF:Inverse() * target):VectorToWorldSpace(Vector3.xAxis)
+	local want = math.atan2(x.Z, x.X)
+	if math.abs(want - now) <= TWIST_STEP then
+		return target
+	end
+	return swingCF * CFrame.fromAxisAngle(Vector3.yAxis, -(now + math.sign(want - now) * TWIST_STEP))
+end
+
+-- Turn the sword target `from` toward `to` at a capped rate: the blade direction first (shortest
+-- arc), then the roll about the blade. Keeps the hand drive's target from ever running so far ahead
+-- of the sword that the drive's short way round becomes the wrong way (the sword flipping over).
+local function limitTurn(from, to, maxDir, maxRoll)
+	local d0, d1 = from.UpVector, to.UpVector
+	local d = Util.rotateToward(d0, d1, maxDir)
+	local axis = d0:Cross(d)
+	local e = from.RightVector
+	if axis.Magnitude > 1e-6 then
+		e = CFrame.fromAxisAngle(axis.Unit, math.acos(math.clamp(d0:Dot(d), -1, 1))):VectorToWorldSpace(e)
+	end
+	e = Util.perpendicular(e, d, Util.perpendicular(Vector3.new(0, -1, 0), d, Vector3.xAxis))
+	local want = Util.perpendicular(to.RightVector, d, e)
+	e = Util.perpendicular(Util.rotateToward(e, want, maxRoll), d, want)
+	return CFrame.fromMatrix(to.Position, e, d, e:Cross(d))
+end
+
 local function wristExcess(rot, flex, handRot)
 	local cone, twist = swingTwist((rot * CFrame.fromAxisAngle(Vector3.xAxis, flex)):Inverse() * handRot)
 	return math.max(0, cone - WRIST_CONE) + math.max(0, math.abs(twist) - WRIST_TWIST)
@@ -556,7 +599,16 @@ function MotorController.Apply(f, dt, inp)
 	end
 	f.CommandedVelocity = vel
 
-	-- 1. joints
+	-- 1. joints (the sword target first turns toward this step's request at a capped rate)
+	if f.SwordTargetCF then
+		if f.SwordAimDir and f.SwordAimEdge then
+			local d = f.SwordAimDir.Unit -- (stored rounded, so renormalise)
+			local e = Util.perpendicular(f.SwordAimEdge, d, Util.perpendicular(Vector3.new(0, -1, 0), d, Vector3.xAxis))
+			local from = CFrame.fromMatrix(Vector3.zero, e, d, e:Cross(d))
+			f.SwordTargetCF = limitTurn(from, f.SwordTargetCF, D.HandTurnRate * dt, D.HandRollRate * dt)
+		end
+		f.SwordAimDir, f.SwordAimEdge = f.SwordTargetCF.UpVector, f.SwordTargetCF.RightVector
+	end
 	solveArms(f, dt)
 	local pose = MotorController.ComputePose(f, dt)
 	for name, j in pairs(f.Joints) do
@@ -567,7 +619,11 @@ function MotorController.Apply(f, dt, inp)
 				local t = (ARM_CLASS[j.Def.DriveClass] and armTone or bodyTone) * (0.25 + 0.75 * segF)
 				if j.Kind == "Ball" and j.Drive then
 					setNum(f, j.Drive, "MaxTorque", cls.Torque * t, cls.Torque * 0.02)
-					setCF(f, j.TargetAtt, "CFrame", j.TargetBase * (pose[name] or CFrame.identity), 0.01, D.TargetAngleEpsilon)
+					local target = pose[name] or CFrame.identity
+					if j.Def.Twist >= TWIST_WALK_MIN then
+						target = walkTwist(f, j, target)
+					end
+					setCF(f, j.TargetAtt, "CFrame", j.TargetBase * target, 0.01, D.TargetAngleEpsilon)
 				elseif j.Kind == "Hinge" then
 					setNum(f, j.Constraint, "ServoMaxTorque", cls.Torque * t, cls.Torque * 0.02)
 					local flex = math.clamp(pose[name] or 0, rad(j.Def.FlexMin), rad(j.Def.FlexMax))
