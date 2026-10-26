@@ -124,7 +124,7 @@ local function onInput(player, seq, mx, mz, yaw, u, v, buttons, ...)
 	if r > 1 then
 		u, v = u / r, v / r
 	end
-	buttons = math.floor(buttons) % 32
+	buttons = math.floor(buttons) % 64
 	i.Seq = seq
 	i.Move = move
 	i.Yaw = yaw % (2 * math.pi)
@@ -134,7 +134,8 @@ local function onInput(player, seq, mx, mz, yaw, u, v, buttons, ...)
 	i.M2 = math.floor(buttons / 2) % 2 == 1
 	i.Kick = math.floor(buttons / 4) % 2 == 1
 	i.Crouch = math.floor(buttons / 8) % 2 == 1
-	i.Sheath = buttons >= 16
+	i.Sheath = math.floor(buttons / 16) % 2 == 1
+	i.Bow = buttons >= 32
 	i.LastPacket = os.clock()
 	-- (no report yet while the client is still building its fighter record)
 	if OwnerSync.Applies(f) and select("#", ...) > 0 and (...) ~= nil and not ownerReport(f, ...) then

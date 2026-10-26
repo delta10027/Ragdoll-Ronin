@@ -22,6 +22,7 @@ local Util = require(script.Parent.Util)
 local StateMachine = require(script.Parent.StateMachine)
 local Runtime = require(script.Parent.Runtime)
 local Kick = require(script.Parent.Kick)
+local Bow = require(script.Parent.Bow)
 
 local BalanceController = {}
 
@@ -134,6 +135,7 @@ function BalanceController.Update(f, dt, inp)
 	local now = Runtime.now()
 	local pelvis = f.Parts.LowerTorso
 	local caps = f.Caps
+	Bow.Update(f, dt, inp) -- G (any other action, or leaving the standing states, ends a bow)
 
 	-- stance height (rate limited: a sudden drop of the spring target makes the body dive)
 	local crouch = (st == "Attacking" or st == "Blocking") and 0.97 or 1

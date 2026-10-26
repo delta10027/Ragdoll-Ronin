@@ -13,6 +13,7 @@
 	  Kick   Bool         C tapped (held a few frames by the client)
 	  Crouch Bool         CTRL held
 	  Sheath Bool         1 tapped (draw / sheathe)
+	  Bow    Bool         G tapped (rei)
 	Inside the simulation both sides read the states with Read(), which validates them exactly
 	like NetService validates packets (nothing is trusted beyond "intent").
 ]]
@@ -30,6 +31,7 @@ local ACTIONS = {
 	Kick = Enum.InputActionType.Bool,
 	Crouch = Enum.InputActionType.Bool,
 	Sheath = Enum.InputActionType.Bool,
+	Bow = Enum.InputActionType.Bool,
 }
 
 -- server: give a player their input context
@@ -89,11 +91,13 @@ function SimInput.Read(player, into)
 	into.Crouch = crouch ~= nil and crouch:GetState() == true
 	local sheath = action(player, "Sheath")
 	into.Sheath = sheath ~= nil and sheath:GetState() == true
+	local bow = action(player, "Bow")
+	into.Bow = bow ~= nil and bow:GetState() == true
 	return into
 end
 
 -- client, outside the simulation (render step): publish this frame's intent
-function SimInput.Fire(player, move, yaw, u, v, m1, m2, kick, crouch, sheath)
+function SimInput.Fire(player, move, yaw, u, v, m1, m2, kick, crouch, sheath, bow)
 	local ctx = player:FindFirstChild(CONTEXT)
 	if not ctx then
 		return false
@@ -112,6 +116,7 @@ function SimInput.Fire(player, move, yaw, u, v, m1, m2, kick, crouch, sheath)
 	fire("Kick", kick == true)
 	fire("Crouch", crouch == true)
 	fire("Sheath", sheath == true)
+	fire("Bow", bow == true)
 	return true
 end
 

@@ -19,6 +19,7 @@ local Runtime = require(script.Parent.Runtime)
 local BodyShape = require(script.Parent.BodyShape)
 local Spacing = require(script.Parent.Spacing)
 local Kick = require(script.Parent.Kick)
+local Bow = require(script.Parent.Bow)
 local StateMachine = require(script.Parent.StateMachine)
 
 local MotorController = {}
@@ -575,6 +576,18 @@ local function uprightPose(f, dt)
 		-- the head stays level and on the target while the body leans back
 		pose.NeckBase = pose.NeckBase * CFrame.Angles(-lean * 0.6, 0, 0)
 	end
+	local bow = Bow.Amount(f)
+	if bow > 0 then
+		-- rei (Sim.Bow): the pelvis tips forward (Apply) and the hips flex by as much, so the legs
+		-- stay straight under the body; the waist adds the rest of the bend and the head nods with it
+		local BW = Config.Bow
+		local hip = rad(BW.Angle * BW.HipShare) * bow
+		pose.Waist = pose.Waist * CFrame.Angles(-rad(BW.Angle * (1 - BW.HipShare)) * bow, 0, 0)
+		pose.NeckHead = pose.NeckHead * CFrame.Angles(-rad(BW.HeadDown) * bow, 0, 0)
+		for _, side in ipairs({ "Left", "Right" }) do
+			pose[side .. "Hip"] = CFrame.Angles(hip, 0, 0) * pose[side .. "Hip"]
+		end
+	end
 	armPose(f, pose)
 	return pose
 end
@@ -679,7 +692,7 @@ function MotorController.Apply(f, dt, inp)
 	-- 2. pelvis: facing + upright
 	local Dr = f.Drives
 	local pelvis = f.Parts.LowerTorso
-	if StateDefs.Upright[st] then
+	if StateDefs.Upright[st] and not f.BowT then -- (a bow holds the facing it started with)
 		local rate = (st == "Attacking" or st == "Blocking" or st == "Kicking") and M.AttackTurnRate or M.TurnRate
 		f.FacingYaw = Util.approachAngle(f.FacingYaw, inp.Yaw, rate * dt)
 	elseif st == "Recovering" then
@@ -695,6 +708,10 @@ function MotorController.Apply(f, dt, inp)
 		-- lean back against the extended leg (about the facing's right axis: + tips the top back)
 		local right = Vector3.new(math.cos(f.FacingYaw), 0, -math.sin(f.FacingYaw))
 		leanCF = CFrame.fromAxisAngle(right, rad(Config.Kick.Lean) * kickExt)
+	elseif f.BowT then
+		-- bowing: the pelvis tips forward (its share of the bend, see uprightPose)
+		local right = Vector3.new(math.cos(f.FacingYaw), 0, -math.sin(f.FacingYaw))
+		leanCF = CFrame.fromAxisAngle(right, -rad(Config.Bow.Angle * Config.Bow.HipShare) * Bow.Amount(f))
 	end
 	local hipTwist = StateDefs.Upright[st] and f.Aim and f.Aim.Twist * Config.Aim.HipTwist or 0
 	setCF(f, Dr.Upright, "CFrame", leanCF * CFrame.Angles(0, f.FacingYaw + hipTwist, 0), 1, rad(0.5))
