@@ -322,7 +322,14 @@ local function resolveBodyHit(att, target, h)
 	DebugService.Log(att.Name, "hit", target.Name, summary)
 
 	local fatal = AnatomyService.CheckFatal(target)
-	SoundFX.Play((severed == "NeckBase" or fatal == "Decapitated") and "Decapitation" or (severed and "Sever") or "Cut", h.Position)
+	-- one blade passing through a body touches several segments: one cut sound per attacker per
+	-- HitSoundCooldown (a sever or decapitation still plays, it is the sound that matters)
+	local hitSound = (severed == "NeckBase" or fatal == "Decapitated") and "Decapitation" or (severed and "Sever") or "Cut"
+	local now2 = os.clock()
+	if hitSound ~= "Cut" or now2 - (att.LastHitSound or 0) >= Config.Sounds.HitSoundCooldown then
+		att.LastHitSound = now2
+		SoundFX.Play(hitSound, h.Position)
+	end
 	if fatal and killFn then
 		killFn(target, fatal, att)
 	end

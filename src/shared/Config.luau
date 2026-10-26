@@ -312,6 +312,7 @@ Config.Sounds = {
 	KickBlocked = { Ids = { 136811265205147 }, Volume = 0.8, PitchMin = 0.95, PitchMax = 1.05, Fallback = "Block" }, -- a teep checked by the guard
 	RollOffMaxDistance = 120,
 	SlashCooldown = 0.2, -- per fighter: fast back-and-forth strokes do not stack whooshes
+	HitSoundCooldown = 0.4, -- per attacker: one cut sound for a blade passing through several body parts
 }
 
 Config.Block = {
