@@ -40,6 +40,7 @@ local BloodFX = require(script.Parent.BloodFX)
 local Feedback = require(script.Parent.Feedback)
 local DebugService = require(script.Parent.DebugService)
 local HitDetection = require(script.Parent.HitDetection)
+local SoundFX = require(script.Parent.SoundFX)
 
 local CombatResolver = {}
 local C = Config.Combat
@@ -142,6 +143,7 @@ local function resolveBladeContact(att, def, h)
 			end
 			feedbackBoth(att, def, "AttackBlocked", "Blocked", info)
 		end
+		SoundFX.Play((outcome == "Parried" and "Parry") or ((outcome == "Glance" or outcome == "Overpowered") and "Clash") or "Block", h.Position)
 		DebugService.Attr(att, "LastBlock", outcome .. " by " .. def.Name)
 		DebugService.Attr(def, "LastBlock", string.format("%s q=%.2f p=%.1f", outcome, q, power))
 		DebugService.Log(att.Name, "->", def.Name, outcome, "q", q, "power", power)
@@ -157,6 +159,7 @@ local function resolveBladeContact(att, def, h)
 		SwordController.Recoil(att, C.RecoilTime * BK.ClashRecoilMult)
 		SwordController.Recoil(def, C.RecoilTime * BK.ClashRecoilMult)
 		feedbackBoth(att, def, "Clash", "Clash", info)
+		SoundFX.Play("Clash", h.Position)
 		DebugService.Attr(att, "LastBlock", "Clash")
 		DebugService.Attr(def, "LastBlock", "Clash")
 		return "Stop"
@@ -166,6 +169,7 @@ local function resolveBladeContact(att, def, h)
 		stroke.EnergyMult *= BK.BeatEnergyMult
 		stroke.GuardPassed[def.Id] = true
 		feedbackBoth(att, def, "BladeBeaten", "BladeKnockedAside", info)
+		SoundFX.Play("Clash", h.Position)
 		DebugService.Attr(def, "LastBlock", "Blade beaten aside")
 		return "Continue"
 	end
@@ -173,6 +177,7 @@ local function resolveBladeContact(att, def, h)
 	deflect(att, -dir, C.DeflectDV * 0.6)
 	SwordController.Recoil(att, C.RecoilTime * BK.ClashRecoilMult)
 	feedbackBoth(att, def, "Clash", "Clash", info)
+	SoundFX.Play("Clash", h.Position)
 	return "Stop"
 end
 
@@ -315,6 +320,7 @@ local function resolveBodyHit(att, target, h)
 	DebugService.Log(att.Name, "hit", target.Name, summary)
 
 	local fatal = AnatomyService.CheckFatal(target)
+	SoundFX.Play((severed == "NeckBase" or fatal == "Decapitated") and "Decapitation" or (severed and "Sever") or "Cut", h.Position)
 	if fatal and killFn then
 		killFn(target, fatal, att)
 	end
@@ -338,6 +344,7 @@ local function processPush(att, hits)
 				else
 					Feedback.Send(att, "Clash", {})
 				end
+				SoundFX.Play(guarded and "Block" or "Clash", h.Position)
 				DebugService.Attr(att, "LastBlock", "Pushed into " .. def.Name)
 			end
 			return

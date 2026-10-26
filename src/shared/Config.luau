@@ -296,6 +296,24 @@ Config.Kick = {
 	BlockedStaggerTime = 0.3, -- the kicker, bounced off the guard
 }
 
+-- Sound effects (server SoundFX). Put Roblox audio asset ids in Ids, as numbers or
+-- "rbxassetid://..." strings; with several, one is picked at random each time. A slot left empty
+-- plays nothing, or its Fallback slot's sound. Played in the world where it happens, so everyone
+-- nearby hears it. Pitch is varied randomly between PitchMin and PitchMax.
+Config.Sounds = {
+	Slash = { Ids = {}, Volume = 0.6, PitchMin = 0.92, PitchMax = 1.1 }, -- a swing starts (whoosh)
+	Block = { Ids = {}, Volume = 0.9, PitchMin = 0.95, PitchMax = 1.05 }, -- blade stopped by a guard
+	Parry = { Ids = {}, Volume = 1, PitchMin = 0.97, PitchMax = 1.03, Fallback = "Block" }, -- block raised just in time
+	Clash = { Ids = {}, Volume = 0.9, PitchMin = 0.9, PitchMax = 1.1, Fallback = "Block" }, -- two swings meet, or a glance
+	Cut = { Ids = {}, Volume = 0.8, PitchMin = 0.9, PitchMax = 1.1 }, -- a blade wounds a body
+	Sever = { Ids = {}, Volume = 0.9, PitchMin = 0.9, PitchMax = 1.05, Fallback = "Cut" }, -- a limb is cut off
+	Decapitation = { Ids = {}, Volume = 1, PitchMin = 0.95, PitchMax = 1.05, Fallback = "Sever" },
+	KickLanded = { Ids = {}, Volume = 0.9, PitchMin = 0.9, PitchMax = 1.1 }, -- a teep lands
+	KickBlocked = { Ids = {}, Volume = 0.8, PitchMin = 0.95, PitchMax = 1.05, Fallback = "Block" }, -- a teep checked by the guard
+	RollOffMaxDistance = 120,
+	SlashCooldown = 0.2, -- per fighter: fast back-and-forth strokes do not stack whooshes
+}
+
 Config.Block = {
 	Strength = 16,
 	ParryWindow = 0.3,
