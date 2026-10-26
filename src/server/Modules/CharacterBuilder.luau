@@ -265,15 +265,19 @@ function CharacterBuilder.Build(spawnCF, opts)
 
 	local sword = SwordBuilder.Build(gripWorld)
 	sword.Model.Parent = model
-	local gripJoint = Instance.new("WeldConstraint")
+	-- where the hand holds it. The grip and the scabbard seat are Welds with these explicit offsets,
+	-- not WeldConstraints: a WeldConstraint keeps whatever offset the parts have when it is enabled,
+	-- and a server enabling it for an owner's draw saw the sword still in the scabbard (the owner's
+	-- sword only replicates through its assembly) and fixed the grip at that twisted offset.
+	sword.HandLocal = hand.CFrame:ToObjectSpace(sword.Handle.CFrame)
+	sword.Handle:SetAttribute("HandLocal", sword.HandLocal)
+	local gripJoint = Instance.new("Weld")
 	gripJoint.Name = "GripJoint"
 	gripJoint.Part0 = hand
 	gripJoint.Part1 = sword.Handle
+	gripJoint.C0 = sword.HandLocal
 	gripJoint.Parent = sword.Model
 	sword.GripJoint = gripJoint
-	-- where the hand holds it (drawing puts it back exactly here, SwordController.Attach)
-	sword.HandLocal = hand.CFrame:ToObjectSpace(sword.Handle.CFrame)
-	sword.Handle:SetAttribute("HandLocal", sword.HandLocal)
 
 	-- saya (scabbard) on the left hip, edge up, the mouth in front of the hip and the scabbard
 	-- running back, down and out (Config.Sheath). It hangs on a Weld whose C0 the draw animates
@@ -307,10 +311,11 @@ function CharacterBuilder.Build(spawnCF, opts)
 		w.Part1 = saya
 		w.C0 = sayaLocal
 		w.Parent = saya
-		local sheathWeld = Instance.new("WeldConstraint")
+		local sheathWeld = Instance.new("Weld")
 		sheathWeld.Name = "SheathWeld"
 		sheathWeld.Part0 = saya
 		sheathWeld.Part1 = sword.Handle
+		sheathWeld.C0 = sayaLocal:ToObjectSpace(handleLocal)
 		sheathWeld.Enabled = false
 		sheathWeld.Parent = saya
 		sword.Saya = saya

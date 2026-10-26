@@ -47,9 +47,9 @@ local function smooth(x)
 end
 
 ------------------------------------------------------------------ attach
--- Move the sword into the right hand (toHand) or into the scabbard. pivot: place it exactly (the
--- simulating side); without, the welds take the parts where they already are (a server copying an
--- owner's replicated draw).
+-- Move the sword into the right hand (toHand) or into the scabbard. Both are Welds with fixed
+-- offsets (CharacterBuilder), so the sword always lands exactly in the grip or the scabbard seat
+-- whatever positions this machine sees; pivot also moves it there right away (the simulating side).
 function Draw.Attach(f, toHand, pivot)
 	local sw = f.Sword
 	if not sw then
