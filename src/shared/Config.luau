@@ -50,7 +50,8 @@ Config.Movement = {
 	OffBalanceSpeedMult = 0.45,
 	KneelSpeedMult = 0.22,
 	TurnRate = math.rad(540),
-	PersonalSpace = 5.6 * S, -- fighters cannot walk closer than this (pelvis to pelvis, see Sim.Spacing)
+	PersonalSpace = 4.0 * S, -- fighters cannot walk closer than this (pelvis to pelvis, see Sim.Spacing):
+	-- close enough that the middle of the blade reaches the other torso with the arms extended
 	PersonalSpacePush = 6, -- 1/s: how firmly fighters inside that distance are eased apart
 	AttackTurnRate = math.rad(260),
 	StandHeight = 3.62 * S, -- pelvis centre above ground
