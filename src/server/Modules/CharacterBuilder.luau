@@ -271,6 +271,42 @@ function CharacterBuilder.Build(spawnCF, opts)
 	gripJoint.Part1 = sword.Handle
 	gripJoint.Parent = sword.Model
 	sword.GripJoint = gripJoint
+	sword.HandLocal = hand.CFrame:ToObjectSpace(sword.Handle.CFrame) -- where the hand holds it (SheathService)
+
+	-- saya (scabbard) worn on the left hip, edge up, the mouth just in front of the hip and the
+	-- scabbard running back and down (Config.Sheath). The sheathed sword sits in it, welded to it.
+	do
+		local SH, SW = Config.Sheath, Config.Sword
+		local pelvis = parts.LowerTorso
+		local d = SH.BladeDir.Unit -- pelvis space (+Z = back)
+		local e = (Vector3.yAxis - d * Vector3.yAxis:Dot(d)).Unit -- edge up
+		local rot = CFrame.fromMatrix(Vector3.zero, e, d, e:Cross(d))
+		local mouth = SH.Mouth * S
+		sword.SheathLocal = CFrame.new(mouth - d * (SW.HandleLength / 2 + SW.GuardThickness / 2)) * rot
+		local len = SW.BladeLength + 0.15
+		local saya = Instance.new("Part")
+		saya.Name = "Saya"
+		saya.Size = Vector3.new(SW.BladeWidth * 1.6, len, SW.BladeThickness + 0.1)
+		saya.CFrame = pelvis.CFrame * CFrame.new(mouth + d * (SW.GuardThickness / 2 + len / 2)) * rot
+		saya.Color = SH.Color
+		saya.Material = Enum.Material.SmoothPlastic
+		saya.CanCollide, saya.CanTouch, saya.CanQuery, saya.CastShadow = false, false, false, false
+		saya.Massless = true
+		saya.CollisionGroup = "RR_Sword"
+		saya.Parent = model
+		local w = Instance.new("WeldConstraint")
+		w.Part0 = pelvis
+		w.Part1 = saya
+		w.Parent = saya
+		local sheathWeld = Instance.new("WeldConstraint")
+		sheathWeld.Name = "SheathWeld"
+		sheathWeld.Part0 = saya
+		sheathWeld.Part1 = sword.Handle
+		sheathWeld.Enabled = false
+		sheathWeld.Parent = saya
+		sword.Saya = saya
+		sword.SheathWeld = sheathWeld
+	end
 
 	local offHand = parts.LeftHand
 	local offGrip = attach(offHand, "OffGrip", offHand.CFrame * CFrame.new(0, -0.05 * S, 0))

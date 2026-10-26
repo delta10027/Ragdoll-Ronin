@@ -398,10 +398,20 @@ local function standLegs(f, dt, pose)
 	end
 	local axis = Vector3.new(-m.Z, 0, m.X) -- rotating the leg about this swings it toward m
 	local fwd = -m.Z
+	-- knee bend that puts the feet on the ground at the pelvis' ACTUAL height: a crouch, or a body
+	-- pushed down (a heavy cut leaning on the guard) bends the knees instead of sinking the legs
+	-- into the ground (upright limbs do not collide, so nothing else would stop them)
+	local height = f.Ground and f.Ground.Height or M.StandHeight
+	local reach = (height - M.HipDrop - M.AnkleToSole) / (M.ThighLength + M.ShinLength)
+	local stanceKnee = math.max(M.StanceKneeBend, 2 * math.acos(math.clamp(reach, 0.2, 1)))
+	stanceKnee = math.min(stanceKnee, rad(130))
+	if EXACT then
+		stanceKnee = quantize(stanceKnee, rad(1)) -- (physics height differs slightly on a predicting client)
+	end
 	for _, side in ipairs({ "Left", "Right" }) do
 		local ph = g.Phase + (side == "Right" and math.pi or 0)
 		local swing = M.GaitHipAmplitude * frac * math.sin(ph)
-		local knee = M.StanceKneeBend + M.GaitKneeAmplitude * frac * math.max(0, math.cos(ph))
+		local knee = stanceKnee + M.GaitKneeAmplitude * frac * math.max(0, math.cos(ph))
 		local stancePitch = (side == "Left" and rad(10) or rad(-8)) * (1 - frac)
 		local splay = (side == "Right" and 1 or -1) * rad(4)
 		local thighPitch = knee * 0.5 + stancePitch
@@ -458,7 +468,7 @@ local function offHandTarget(f)
 end
 
 local function twoHanded(f)
-	return f.Sword ~= nil and f.Drives.OffPos ~= nil and f.Caps.OffArm > 0.2 and StateDefs.Upright[f.State] == true
+	return f.Sword ~= nil and not f.Sheathed and f.Drives.OffPos ~= nil and f.Caps.OffArm > 0.2 and StateDefs.Upright[f.State] == true
 		and f.SwordTargetCF ~= nil and not f.OffHandFree
 end
 
@@ -479,7 +489,7 @@ local function solveArms(f, dt)
 	local out = {}
 	f.ArmSolution = out
 	f.SwordHoldCF = nil
-	if f.Sword and f.Joints.RightShoulder and not f.Joints.RightShoulder.Severed and f.SwordTargetCF then
+	if f.Sword and not f.Sheathed and f.Joints.RightShoulder and not f.Joints.RightShoulder.Severed and f.SwordTargetCF then
 		local rot, flex, wristRot, reached = solveSwordArm(st, f.SwordTargetCF, dt)
 		out.RightShoulder, out.RightElbow, out.RightWrist = rot, flex, wristRot
 		f.SwordHoldCF = reached
@@ -612,6 +622,7 @@ function MotorController.Apply(f, dt, inp)
 	-- commanded locomotion, before the pose: the gait cycle follows it (this step's, not last step's)
 	local moveDir = StateDefs.Upright[st] and inp.Move or Vector3.zero
 	local speed = M.WalkSpeed * tone.Move * caps.Move * (caps.Kneeling and M.KneelSpeedMult or 1)
+		* (inp.Crouch and M.CrouchSpeedMult or 1)
 	local vel = moveDir * speed
 	if StateDefs.Upright[st] then
 		vel = Spacing.Adjust(f, vel)
@@ -712,7 +723,7 @@ function MotorController.Apply(f, dt, inp)
 	-- 5. hands
 	if Dr.HandPos and Dr.HandOri then
 		local k = 0
-		if f.Sword and f.SwordTargetCF then
+		if f.Sword and not f.Sheathed and f.SwordTargetCF then
 			k = armTone * caps.SwordArm * caps.Grip
 			if Runtime.now() < f.Attack.RecoilUntil then
 				k *= Config.Combat.RecoilHandScale

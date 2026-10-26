@@ -24,6 +24,7 @@ local COLORS = {
 	Guard = Color3.fromRGB(90, 170, 255),
 	Recoil = Color3.fromRGB(190, 120, 255),
 	Unarmed = Color3.fromRGB(140, 140, 140),
+	Sheathed = Color3.fromRGB(140, 140, 140),
 	Disabled = Color3.fromRGB(120, 120, 120),
 }
 local TRAIL = 6

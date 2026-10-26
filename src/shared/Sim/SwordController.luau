@@ -211,7 +211,7 @@ end
 function SwordController.UpdateAim(f, dt, inp)
 	local now = Runtime.now()
 	local st = f.State
-	local swordOK = f.Sword ~= nil and f.Caps.SwordArm > 0.05
+	local swordOK = f.Sword ~= nil and not f.Sheathed and f.Caps.SwordArm > 0.05
 	local mode = "Ready"
 	if swordOK and st == "Attacking" then
 		mode = "Attack"
@@ -468,10 +468,10 @@ end
 -- (Stroke = nil: it may only meet other blades, see CombatResolver.Process).
 function SwordController.Track(f, dt, inp)
 	local atk = f.Attack
-	if not f.Sword then
+	if not f.Sword or f.Sheathed then
 		atk.Stroke = nil
 		atk.PrevBladeCF = nil
-		setPhase(f, "Unarmed")
+		setPhase(f, f.Sword and "Sheathed" or "Unarmed")
 		return nil
 	end
 	local cf = f.Sword.Blade.CFrame

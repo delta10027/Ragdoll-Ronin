@@ -2,15 +2,15 @@
 	NetService: the only entry points from clients.
 
 	CombatInput (UnreliableRemoteEvent, ~60 Hz): seq, moveX, moveZ, yaw, aimU, aimV, buttons
-	  (buttons: bit0 = M1, bit1 = M2, bit2 = kick)
+	  (buttons: bit0 = M1, bit1 = M2, bit2 = kick, bit3 = crouch)
 	  * token-bucket rate limit per player; malformed or non-finite packets are dropped
 	  * out-of-order packets (seq not increasing) are dropped
-	  * move clamped to unit length, aim clamped to the unit disk, buttons masked to 3 bits
+	  * move clamped to unit length, aim clamped to the unit disk, buttons masked to 4 bits
 	  The server converts this INTENT into motion itself (speed caps, inertia, physical drives),
 	  so no packet can move the sword faster than physics allows or declare a hit/damage.
 	  Owner mode adds the client's own simulation of its fighter after the buttons (see OwnerSync):
 	    state, balance, guard (bool), aimU, aimV, aimVU, aimVV, bound (bool), ack
-	CombatAction (RemoteEvent): "Recover" | "Reset", cooldown limited.
+	CombatAction (RemoteEvent): "Recover" | "Reset" | "Sheath" (draw / sheathe), cooldown limited.
 	Under server authority the per-frame intent comes from InputActions instead (Sim.SimInput,
 	created here per player); CombatInput packets are then ignored.
 ]]
@@ -25,6 +25,7 @@ local DebugService = require(script.Parent.DebugService)
 local Runtime = require(Shared.Sim.Runtime)
 local SimInput = require(Shared.Sim.SimInput)
 local OwnerSync = require(script.Parent.OwnerSync)
+local SheathService = require(script.Parent.SheathService)
 
 local NetService = {}
 local N = Config.Network
@@ -122,7 +123,7 @@ local function onInput(player, seq, mx, mz, yaw, u, v, buttons, ...)
 	if r > 1 then
 		u, v = u / r, v / r
 	end
-	buttons = math.floor(buttons) % 8
+	buttons = math.floor(buttons) % 16
 	i.Seq = seq
 	i.Move = move
 	i.Yaw = yaw % (2 * math.pi)
@@ -130,7 +131,8 @@ local function onInput(player, seq, mx, mz, yaw, u, v, buttons, ...)
 	i.AimV = v
 	i.M1 = buttons % 2 == 1
 	i.M2 = math.floor(buttons / 2) % 2 == 1
-	i.Kick = buttons >= 4
+	i.Kick = math.floor(buttons / 4) % 2 == 1
+	i.Crouch = buttons >= 8
 	i.LastPacket = os.clock()
 	-- (no report yet while the client is still building its fighter record)
 	if OwnerSync.Applies(f) and select("#", ...) > 0 and (...) ~= nil and not ownerReport(f, ...) then
@@ -159,6 +161,8 @@ local function onAction(player, action)
 	end
 	if action == "Recover" then
 		BalanceController.RequestRecover(f)
+	elseif action == "Sheath" then
+		SheathService.Toggle(f)
 	elseif action == "Reset" and resetFn then
 		resetFn(f)
 	end

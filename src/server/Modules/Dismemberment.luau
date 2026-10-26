@@ -223,7 +223,9 @@ function Dismemberment.Sever(f, boundaryName, direction, power)
 				f.Drives[key] = nil
 			end
 		end
-		moveSwordToDebris(f, debrisModel)
+		if not f.Sheathed then -- (a sheathed sword stays in its saya on the hip)
+			moveSwordToDebris(f, debrisModel)
+		end
 	end
 	if distal.LeftHand and f.Drives.OffPos then
 		f.Drives.OffPos:Destroy()
@@ -268,7 +270,7 @@ end
 
 -- Lose the sword without losing the hand (crippled grip)
 function Dismemberment.DropSword(f, impulse)
-	if not f.Sword then
+	if not f.Sword or f.Sheathed then
 		return
 	end
 	local sword = f.Sword
