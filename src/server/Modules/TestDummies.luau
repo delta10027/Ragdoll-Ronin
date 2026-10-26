@@ -4,6 +4,10 @@
 	through exactly the same controllers, hit detection and anatomy as a player; after dying it
 	respawns at the same spot with the same behaviour (Lifecycle keeps its spawn options).
 
+	Like a player, a dummy turns to face the nearest player's fighter in range (FaceRange) and
+	otherwise its spawn direction; it can be hit, staggered, knocked down, cut apart and killed like
+	anyone else. Its head label shows its state and remaining blood.
+
 	Behaviours (inputs as a player would give them; aim u = right, v = up on the combat circle):
 	  SwingHorizontal  every SwingPeriod: wind up at the right, cut through to the left, release
 	  SwingVertical    every SwingPeriod: wind up overhead, cut down to the bottom, release
@@ -18,6 +22,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.RagdollRonin.Config)
 local Input = require(ReplicatedStorage.RagdollRonin.Sim.Input)
 local Registry = require(script.Parent.Registry)
+local Util = require(ReplicatedStorage.RagdollRonin.Sim.Util)
 
 local TestDummies = {}
 
@@ -80,6 +85,38 @@ local function spawnLine(spawn)
 	end
 end
 
+-- yaw toward the nearest living player's fighter within range (BalanceController's convention)
+local function faceYaw(f)
+	local me = f.Parts.LowerTorso
+	if not me then
+		return f.SpawnYaw
+	end
+	local best, bestDist = nil, Config.Debug.TestDummyLine.FaceRange
+	for _, other in ipairs(Registry.List()) do
+		local p = other.Player and not other.Dead and other.Parts.LowerTorso
+		if p then
+			local d = Util.flat(p.Position - me.Position)
+			if d.Magnitude < bestDist then
+				best, bestDist = d, d.Magnitude
+			end
+		end
+	end
+	if not best or bestDist < 0.5 then
+		return f.SpawnYaw
+	end
+	return math.atan2(-best.X, -best.Z)
+end
+
+local function updateLabel(f)
+	local head = f.Parts.Head
+	local gui = head and head:FindFirstChild("Label")
+	local text = gui and gui:FindFirstChildWhichIsA("TextLabel")
+	if text then
+		local blood = f.Anatomy and f.Anatomy.Blood / Config.Blood.Max or 1
+		text.Text = string.format("%s\n%s  ·  blood %d%%", f.SpawnOpts.Label or f.Name, f.State or "?", math.floor(blood * 100 + 0.5))
+	end
+end
+
 -- api: { Spawn = Lifecycle.Spawn }
 function TestDummies.Init(api)
 	if not Config.Debug.TestDummies then
@@ -99,13 +136,22 @@ function TestDummies.Init(api)
 	end
 
 	-- drive every behaviour dummy's input (as if a player held the buttons and moved the mouse)
-	RunService.Heartbeat:Connect(function()
+	local labelAccum = 0
+	RunService.Heartbeat:Connect(function(dt)
 		local now = os.clock()
+		labelAccum += dt
+		local refreshLabels = labelAccum >= 0.2
+		if refreshLabels then
+			labelAccum = 0
+		end
 		for _, f in ipairs(Registry.List()) do
 			local behavior = f.Behavior and BEHAVIORS[f.Behavior]
 			if behavior and not f.Dead then
+				if refreshLabels then
+					updateLabel(f)
+				end
 				local i = Input.Neutral()
-				i.Yaw = f.SpawnYaw or f.FacingYaw
+				i.Yaw = faceYaw(f)
 				local t = now - (f.SpawnTime or now) - T.StartDelay
 				if t >= 0 then
 					for k, v in pairs(behavior(t)) do

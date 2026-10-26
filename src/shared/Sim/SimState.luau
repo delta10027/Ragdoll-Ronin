@@ -72,6 +72,23 @@ field(UT, "AimVV", function(f) return f.Aim.VV end, function(f, v) f.Aim.VV = v 
 field(UT, "AimGuard", function(f) return f.Aim.Guard end, function(f, v) f.Aim.Guard = v end)
 field(UT, "AimReady", function(f) return f.Aim.Ready end, function(f, v) f.Aim.Ready = v end)
 vecField(UT, "AimEdge", function(f) return f.Aim.Edge end, function(f, v) f.Aim.Edge = v or Vector3.new(0, -1, 0) end)
+-- a bound (blocked) attack: where the cursor was stopped and the direction it may not push on.
+-- BindU comes first: it creates or clears the record the other three fill in.
+field(UT, "BindU", function(f) return f.Aim.Bind and f.Aim.Bind.U end, function(f, v)
+	if v == nil then
+		f.Aim.Bind = nil
+	else
+		f.Aim.Bind = f.Aim.Bind or { U = v, V = 0, DU = 0, DV = -1 }
+		f.Aim.Bind.U = v
+	end
+end)
+for _, key in ipairs({ "V", "DU", "DV" }) do
+	field(UT, "Bind" .. key, function(f) return f.Aim.Bind and f.Aim.Bind[key] end, function(f, v)
+		if f.Aim.Bind and v ~= nil then
+			f.Aim.Bind[key] = v
+		end
+	end)
+end
 -- speed-limited sword target (MotorController.limitTurn): blade direction and edge
 vecField(UT, "SwordAimDir", function(f) return f.SwordAimDir end, function(f, v) f.SwordAimDir = v end)
 vecField(UT, "SwordAimEdge", function(f) return f.SwordAimEdge end, function(f, v) f.SwordAimEdge = v end)

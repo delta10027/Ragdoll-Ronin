@@ -98,6 +98,7 @@ local function stepPre(f, dt)
 	end
 	checkDisarm(f)
 	stepControllers(f, dt)
+	SwordController.PublishBind(f)
 	DebugService.Tick(f)
 end
 
@@ -116,6 +117,7 @@ local function stepHeartbeat(f)
 		return
 	end
 	checkDisarm(f)
+	SwordController.PublishBind(f)
 	DebugService.Tick(f)
 end
 

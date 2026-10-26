@@ -100,7 +100,7 @@ function Lifecycle.Spawn(player, opts)
 		local head = data.Parts.Head
 		local gui = Instance.new("BillboardGui")
 		gui.Name = "Label"
-		gui.Size = UDim2.fromOffset(170, 26)
+		gui.Size = UDim2.fromOffset(190, 40)
 		gui.StudsOffsetWorldSpace = Vector3.new(0, 1.6, 0)
 		gui.AlwaysOnTop = true
 		gui.MaxDistance = 80
@@ -110,7 +110,7 @@ function Lifecycle.Spawn(player, opts)
 		text.TextColor3 = Color3.new(1, 1, 1)
 		text.TextStrokeTransparency = 0.3
 		text.Font = Enum.Font.GothamMedium
-		text.TextSize = 15
+		text.TextSize = 14
 		text.Text = opts.Label
 		text.Parent = gui
 		gui.Parent = head

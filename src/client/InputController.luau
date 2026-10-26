@@ -17,6 +17,7 @@ local CameraController = require(script.Parent.CameraController)
 local Sim = ReplicatedStorage:WaitForChild("RagdollRonin"):WaitForChild("Sim")
 local Runtime = require(Sim:WaitForChild("Runtime"))
 local SimInput = require(Sim:WaitForChild("SimInput"))
+local SwordController = require(Sim:WaitForChild("SwordController"))
 
 local InputController = {}
 local A = Config.Aim
@@ -80,6 +81,11 @@ function InputController.Update(ctx, dt)
 		if r > 1 then
 			s.AimU, s.AimV = s.AimU / r, s.AimV / r
 		end
+		-- a blocked attack: the cursor stops where the blades met and can only be drawn back
+		local bind = s.M1 and InputController.Bind(ctx)
+		if bind then
+			s.AimU, s.AimV = SwordController.ConstrainCursor(s.AimU, s.AimV, bind)
+		end
 	else
 		CameraController.Rotate(ctx, delta.X, delta.Y)
 		local k = math.min(1, 8 * dt)
@@ -119,6 +125,28 @@ function InputController.Update(ctx, dt)
 		s.Seq += 1
 		ctx.Remotes.CombatInput:FireServer(s.Seq, s.Move.X, s.Move.Z, ctx.Camera.Yaw, s.AimU, s.AimV, buttons)
 	end
+end
+
+-- The fighter's bound attack (see SwordController.Bind), or nil: the predicted copy under server
+-- authority, otherwise the server's
+function InputController.Bind(ctx)
+	local model = ctx.Fighter
+	if not model or not model.Parent then
+		return nil
+	end
+	local ut, lt = model:FindFirstChild("UpperTorso"), model:FindFirstChild("LowerTorso")
+	if ut and lt and lt:GetAttribute("S_State") ~= nil then
+		local u = ut:GetAttribute("S_BindU")
+		if u == nil then
+			return nil
+		end
+		return { U = u, V = ut:GetAttribute("S_BindV") or 0, DU = ut:GetAttribute("S_BindDU") or 0, DV = ut:GetAttribute("S_BindDV") or -1 }
+	end
+	local p, d = model:GetAttribute("AimBind"), model:GetAttribute("AimBindDir")
+	if typeof(p) == "Vector3" and typeof(d) == "Vector3" then
+		return { U = p.X, V = p.Y, DU = d.X, DV = d.Y }
+	end
+	return nil
 end
 
 -- Recent cursor motion (disk units per second) over the last `window` seconds

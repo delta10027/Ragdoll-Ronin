@@ -19,6 +19,9 @@
 	      raised within ParryWindow -> Parried: attacker deflected hard + staggered
 	      otherwise                 -> Blocked: attacker deflected + recoil, defender pays balance
 	  defender not blocking -> Clash (both deflect) if they were swinging, else Beat (blade knocked aside)
+	Blocked, parried and clashing attacks are also BOUND (SwordController.Bind): the attacker's
+	cursor stops where the blades met and can only be drawn back. Blades meeting without a stroke
+	(a slow push into a guard or a blade) bind too, without any strike.
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage.RagdollRonin
@@ -122,12 +125,14 @@ local function resolveBladeContact(att, def, h)
 			feedbackBoth(att, def, "GuardBroken", "GuardOverpowered", info)
 		elseif parry then
 			outcome = "Parried"
+			SwordController.Bind(att)
 			deflect(att, -dir, C.ParryDeflectDV)
 			SwordController.Recoil(att, C.ParryStaggerTime)
 			BalanceController.Stagger(att, C.ParryStaggerTime, -dir, "Parried")
 			feedbackBoth(att, def, "AttackParried", "Parried", info)
 		else
 			outcome = "Blocked"
+			SwordController.Bind(att)
 			deflect(att, -dir, C.DeflectDV)
 			deflect(def, dir, C.DeflectDV * 0.35)
 			SwordController.Recoil(att, C.RecoilTime)
@@ -145,6 +150,8 @@ local function resolveBladeContact(att, def, h)
 
 	-- blades met outside a guard
 	if def.Attack.Stroke then
+		SwordController.Bind(att)
+		SwordController.Bind(def)
 		deflect(att, -dir, C.DeflectDV * 0.8)
 		deflect(def, dir, C.DeflectDV * 0.8)
 		SwordController.Recoil(att, C.RecoilTime * BK.ClashRecoilMult)
@@ -162,6 +169,7 @@ local function resolveBladeContact(att, def, h)
 		DebugService.Attr(def, "LastBlock", "Blade beaten aside")
 		return "Continue"
 	end
+	SwordController.Bind(att)
 	deflect(att, -dir, C.DeflectDV * 0.6)
 	SwordController.Recoil(att, C.RecoilTime * BK.ClashRecoilMult)
 	feedbackBoth(att, def, "Clash", "Clash", info)
@@ -318,7 +326,30 @@ local function resolveBodyHit(att, target, h)
 end
 
 ------------------------------------------------------------------ entry
+-- no stroke open: the blade is only pushed, so it can bind against a blade but never strike
+local function processPush(att, hits)
+	for _, h in ipairs(hits) do
+		local def = Registry.FromPart(h.Part)
+		if def and def ~= att and not def.Dead and h.Part:GetAttribute("SwordPart") then
+			local guarded = def.State == "Blocking" and def.Block.Active
+			if (guarded or h.Part:GetAttribute("SwordPart") == "Blade") and SwordController.Bind(att) then
+				if guarded then
+					feedbackBoth(att, def, "AttackBlocked", "Blocked", {})
+				else
+					Feedback.Send(att, "Clash", {})
+				end
+				DebugService.Attr(att, "LastBlock", "Pushed into " .. def.Name)
+			end
+			return
+		end
+	end
+end
+
 function CombatResolver.Process(att, hits)
+	if not att.Attack.Stroke then
+		processPush(att, hits)
+		return
+	end
 	for idx, h in ipairs(hits) do
 		local stroke = att.Attack.Stroke
 		if not stroke or att.Dead then

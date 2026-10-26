@@ -7,7 +7,8 @@
 	  trail/arrow recent cursor motion = swing direction (the edge follows it)
 	  diamond     where the server-simulated blade tip actually is (projected), showing lag/inertia
 	Colours follow the server's AttackPhase: Ready/Guiding (white/amber), Swing (red),
-	Guard (blue), Recoil (violet). Feedback text flashes for blocks, parries, interrupts, hits.
+	Guard (blue), Recoil (violet); violet with "BOUND" while a blocked attack holds the cursor.
+	Feedback text flashes for blocks, parries, interrupts, hits.
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("RagdollRonin")
@@ -226,6 +227,11 @@ function CombatCursorUI.Update(ctx, dt)
 	if s.M2 and not disabled and phase ~= "Unarmed" then
 		color = COLORS.Guard
 	end
+	-- a bound (blocked) attack: the cursor is held where the blades met until it is drawn back
+	local bound = s.M1 and not disabled and InputController.Bind(ctx) ~= nil
+	if bound then
+		color = COLORS.Recoil
+	end
 	local now = os.clock()
 	if ui.FlashUntil and now < ui.FlashUntil then
 		color = ui.FlashColor
@@ -299,7 +305,13 @@ function CombatCursorUI.Update(ctx, dt)
 	end
 
 	ui.Label.Position = UDim2.fromOffset(center.X, center.Y + R + 10)
-	ui.Label.Visible = now < ui.LabelUntil
+	if bound and now >= ui.LabelUntil then
+		ui.Label.Text = "BOUND - pull back"
+		ui.Label.TextColor3 = COLORS.Recoil
+		ui.Label.Visible = true
+	else
+		ui.Label.Visible = now < ui.LabelUntil
+	end
 	if ui.DeathUntil then
 		local left = math.max(0, ui.DeathUntil - now)
 		ui.Death.Text = (ui.DeathBase or "") .. string.format("   respawn in %.0f", left)
