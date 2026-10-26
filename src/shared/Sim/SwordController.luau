@@ -40,6 +40,7 @@ local Util = require(script.Parent.Util)
 local Runtime = require(script.Parent.Runtime)
 local BodyShape = require(script.Parent.BodyShape)
 local Draw = require(script.Parent.Draw)
+local Bow = require(script.Parent.Bow)
 
 local SwordController = {}
 
@@ -76,6 +77,9 @@ local READY_DIR = A.ReadyBlade.Unit
 -- while kicking the sword is held up in guard, clear of the rising knee (Config.Kick)
 local KICK_POS = Config.Kick.HandsGrip * S
 local KICK_DIR = Config.Kick.HandsBlade.Unit
+-- while bowing a drawn sword is lowered in front, tip down and forward (Config.Bow)
+local BOW_POS = Config.Bow.Grip * S
+local BOW_DIR = Config.Bow.Blade.Unit
 -- blade point whose motion defines "the direction the cut travels" (mid-blade toward the tip)
 local CUT_POINT = Config.Sword.HandleLength * 0.25 + Config.Sword.BladeLength * 0.6
 
@@ -311,6 +315,11 @@ function SwordController.UpdateAim(f, dt, inp)
 	local kicking = st == "Kicking"
 	pos = pos:Lerp(kicking and KICK_POS or READY_POS, ready)
 	dir = Util.slerpUnit(dir, kicking and KICK_DIR or READY_DIR, ready)
+	local bow = Bow.Amount(f)
+	if bow > 0 then
+		pos = pos:Lerp(BOW_POS, bow)
+		dir = Util.slerpUnit(dir, BOW_DIR, bow)
+	end
 	-- body twist for MotorController (derived each step from the cursor, so it needs no rollback state)
 	aim.Twist = (atwist + (gtwist - atwist) * g) * (1 - ready)
 

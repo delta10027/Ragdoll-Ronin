@@ -334,6 +334,20 @@ Config.Draw = {
 	ClearMargin = 0.05, -- studs past the mouth the tip travels before the blade turns
 }
 
+-- Bow (G): a standing rei. The body bends forward from the hips with the back straight, the gaze
+-- following it down, holds, and straightens up again. Any other action (moving, M1, M2, C, 1) ends
+-- it at once. With the sword drawn the blade is lowered in front, tip down and forward.
+Config.Bow = {
+	DownTime = 0.6,
+	HoldTime = 0.7,
+	UpTime = 0.6,
+	Angle = 32, -- forward bend of the upper body (degrees)
+	HipShare = 0.65, -- part of it taken at the hips (the pelvis tips), the rest at the waist
+	HeadDown = 12, -- extra nod of the head (degrees)
+	Grip = Vector3.new(0.35, -1.2, -1.0), -- drawn sword lowered (upper-torso space, unscaled)
+	Blade = Vector3.new(0.1, -0.25, -0.96),
+}
+
 -- Sound effects (server SoundFX). Put Roblox audio asset ids in Ids, as numbers or
 -- "rbxassetid://..." strings; with several, one is picked at random each time. A slot left empty
 -- plays nothing, or its Fallback slot's sound. Played in the world where it happens, so everyone
