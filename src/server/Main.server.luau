@@ -73,7 +73,7 @@ TestDummies.Init({ Spawn = Lifecycle.Spawn })
 ------------------------------------------------------------------ error isolation
 local lastError = {}
 local function guarded(f, phase, fn, ...)
-	local ok, err = pcall(fn, ...)
+	local ok, err = xpcall(fn, debug.traceback, ...)
 	if not ok then
 		local key = f.Id .. phase
 		local now = os.clock()
