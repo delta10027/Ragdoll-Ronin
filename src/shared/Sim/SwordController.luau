@@ -41,6 +41,7 @@ local Runtime = require(script.Parent.Runtime)
 local BodyShape = require(script.Parent.BodyShape)
 local Draw = require(script.Parent.Draw)
 local Bow = require(script.Parent.Bow)
+local Incant = require(script.Parent.Incant)
 
 local SwordController = {}
 
@@ -217,7 +218,8 @@ function SwordController.UpdateAim(f, dt, inp)
 	local now = Runtime.now()
 	local st = f.State
 	Draw.Input(f, inp) -- 1: draw / sheathe (animated, Shared.Sim.Draw)
-	local swordOK = f.Sword ~= nil and not f.Sheathed and not f.DrawKind and f.Caps.SwordArm > 0.05
+	Incant.Input(f, inp) -- J: incantation (Shared.Sim.Incant)
+	local swordOK = f.Sword ~= nil and not f.Sheathed and not f.DrawKind and not f.IncantT and f.Caps.SwordArm > 0.05
 	local mode = "Ready"
 	if swordOK and st == "Attacking" then
 		mode = "Attack"
@@ -367,6 +369,11 @@ function SwordController.UpdateAim(f, dt, inp)
 		-- drawing / sheathing: the scripted path (it runs along the scabbard, so no body clearance)
 		target = Draw.Pose(f, dt, target)
 		aim.Edge = target.RightVector
+	elseif f.IncantT then
+		-- incantation: the blade level across the chest, the free hand along the flat
+		f.DrawPose = nil
+		target = Incant.Pose(f, dt, target)
+		aim.Edge = target.RightVector
 	else
 		f.DrawPose = nil
 	end
@@ -513,6 +520,28 @@ function SwordController.Track(f, dt, inp)
 	local speed = rel.Magnitude
 	atk.TipSpeed = speed
 	local now = Runtime.now()
+	-- momentum: how far the tip has really travelled over the last MomentumWindow (the longest
+	-- chord between its position now and any recent one, in upper-torso space). A swing covers
+	-- ground; whipping the sword round a small circle is fast but never gets further than the
+	-- circle's width, so it carries no momentum (CombatResolver.strikePower)
+	local ut = f.Parts.UpperTorso
+	if ut then
+		local trail = atk.TipTrail
+		if not trail then
+			trail = {}
+			atk.TipTrail = trail
+		end
+		local p = ut.CFrame:PointToObjectSpace(cf:PointToWorldSpace(tipLocal))
+		table.insert(trail, { now, p })
+		while trail[1] and now - trail[1][1] > C.MomentumWindow do
+			table.remove(trail, 1)
+		end
+		local arc = 0
+		for _, e in ipairs(trail) do
+			arc = math.max(arc, (e[2] - p).Magnitude)
+		end
+		atk.Arc = arc
+	end
 
 	local canStrike = f.State == "Attacking" and now >= atk.RecoilUntil and f.Caps.SwordArm > 0.05
 	local s = atk.Stroke

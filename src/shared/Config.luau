@@ -260,8 +260,11 @@ Config.Combat = {
 	StrokeEndSpeed = 8,
 	StrokeEndHold = 0.09,
 	ReversalDot = -0.25, -- sharp reversal starts a new stroke
-	CommitmentDistance = 3.5, -- tip travel for a fully committed stroke
+	CommitmentDistance = 3.5, -- momentum arc (below) for a fully committed stroke
 	MinCommitment = 0.35,
+	MomentumWindow = 0.3, -- seconds of tip motion the momentum arc is measured over
+	MinMomentumArc = 1.6, -- studs: a body hit whose tip covered less than this in the window does no damage
+	-- (a fast spin of the sword round a small circle never covers more than the circle's width)
 	FollowThroughTime = 0.18,
 	SubstepDistance = 0.5, -- max tip travel per sweep substep
 	MaxSubsteps = 6,
@@ -367,6 +370,50 @@ Config.Bow = {
 	Blade = Vector3.new(0.1, 0.35, -0.93), -- (the torso is bent far forward: this points down and ahead)
 }
 
+-- Armour (loadout menu, M): pieces of lacquered armour over the body. A damaging hit on a covered
+-- segment is stopped by the armour (the blade bounces off: only PowerThrough of it reaches the
+-- body, as a blunt blow) and costs the piece one of its Hits; at 0 the piece breaks off and the
+-- body under it is exposed. Neck, hands and feet are never covered: the gaps to aim for.
+-- Equipping only works out of combat (not hit for EquipCooldown seconds) and restores the piece.
+Config.Armor = {
+	PowerThrough = 0.2,
+	EquipCooldown = 8,
+	Order = { "Helmet", "Chest", "Arms", "Legs" },
+	Pieces = {
+		Helmet = { Label = "Kabuto (helmet)", Hits = 3, Segments = { "Head" }, Color = Color3.fromRGB(30, 28, 30) },
+		Chest = { Label = "Do (chest)", Hits = 5, Segments = { "UpperTorso", "LowerTorso" }, Color = Color3.fromRGB(95, 22, 24) },
+		Arms = { Label = "Kote (sleeves)", Hits = 4, Segments = { "LeftUpperArm", "LeftForearm", "RightUpperArm", "RightForearm" }, Color = Color3.fromRGB(38, 36, 40) },
+		Legs = { Label = "Suneate (greaves)", Hits = 4, Segments = { "LeftThigh", "LeftShin", "RightThigh", "RightShin" }, Color = Color3.fromRGB(38, 36, 40) },
+	},
+	Inflate = 0.07 * S, -- shell thickness over each body part
+}
+
+-- Incantations (J, chosen in the loadout menu): the fighter holds the sword level across the
+-- chest and runs the free hand along the flat from the guard to the tip (Shared.Sim.Incant);
+-- the blade then takes the incantation for Duration seconds ("Incantation : Fire" in chat).
+Config.Incant = {
+	RaiseTime = 0.4, -- the blade comes level across the chest, the left hand to the guard
+	RubTime = 1.0, -- the hand runs along the flat to the tip
+	HoldTime = 0.3,
+	LowerTime = 0.4,
+	Grip = Vector3.new(0.85, 0.3, -1.15), -- right hand (upper-torso space, unscaled)
+	Blade = Vector3.new(-1, 0.06, -0.12), -- the blade points left across the body
+	Edge = Vector3.new(0, 0, -1), -- edge forward, flat up under the hand
+	HandAbove = 0.2, -- the palm rides this far above the blade's centre line (scaled)
+}
+Config.Incantations = {
+	Order = { "Fire" },
+	Fire = {
+		Label = "Fire",
+		Duration = 25, -- seconds the blade burns
+		Cooldown = 35, -- from the start of one incantation to the next
+		PowerMult = 1.2, -- a burning blade strikes harder (cuts, blocks it pushes through)
+		BurnTime = 3, -- a body part it wounds burns this long...
+		BurnIntegrityPerSecond = 6, -- ...losing this much integrity per second (of 100)
+		BurnBalancePerSecond = 4,
+	},
+}
+
 -- Sound effects (server SoundFX). Put Roblox audio asset ids in Ids, as numbers or
 -- "rbxassetid://..." strings; with several, one is picked at random each time. A slot left empty
 -- plays nothing, or its Fallback slot's sound. Played in the world where it happens, so everyone
@@ -383,6 +430,10 @@ Config.Sounds = {
 	KickBlocked = { Ids = { 136811265205147 }, Volume = 0.8, PitchMin = 0.95, PitchMax = 1.05, Fallback = "Block" }, -- a teep checked by the guard
 	Draw = { Ids = {}, Volume = 0.8, PitchMin = 0.95, PitchMax = 1.05 }, -- drawing the katana (1)
 	Sheathe = { Ids = {}, Volume = 0.8, PitchMin = 0.95, PitchMax = 1.05 }, -- sheathing it
+	ArmorHit = { Ids = {}, Volume = 0.9, PitchMin = 0.85, PitchMax = 1.0, Fallback = "Block" }, -- a blade stopped by armour
+	ArmorBreak = { Ids = {}, Volume = 1, PitchMin = 0.9, PitchMax = 1.0, Fallback = "Clash" }, -- an armour piece breaks
+	Incantation = { Ids = {}, Volume = 0.9, PitchMin = 1, PitchMax = 1 }, -- an incantation takes hold of the blade
+	FireHit = { Ids = {}, Volume = 0.8, PitchMin = 0.9, PitchMax = 1.1 }, -- a burning blade sets a body part alight
 	RollOffMaxDistance = 120,
 	SlashCooldown = 0.2, -- per fighter: fast back-and-forth strokes do not stack whooshes
 	HitSoundCooldown = 0.4, -- per attacker: one cut sound for a blade passing through several body parts
@@ -492,6 +543,13 @@ Config.Camera = {
 	FollowSharpness = 14,
 	MinPitch = -0.75,
 	MaxPitch = 0.45,
+	-- lock-on (K, client LockOn): a spinning diamond marks the fighter K would lock onto (the one
+	-- nearest the middle of the screen); locked, the camera (and so the facing) follows them
+	LockRange = 60, -- studs: candidates
+	LockBreakRange = 90, -- studs: a lock is dropped beyond this
+	LockScreenRadius = 0.4, -- candidates within this fraction of the screen from its centre
+	LockTurnSharpness = 10, -- 1/s: how quickly the camera swings round to the target
+	LockPitchBias = -0.12, -- the camera looks slightly down past the target
 }
 
 return Config

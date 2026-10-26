@@ -21,7 +21,8 @@ function Bow.Update(f, dt, inp)
 	f.BowHeld = inp.Bow == true
 	local st = f.State
 	local still = (st == "Idle" or st == "Moving") and inp.Move.Magnitude <= 0.1
-	local busy = inp.M1 or inp.M2 or inp.Kick or inp.Sheath or f.DrawKind ~= nil or f.Caps.Kneeling
+	local busy = inp.M1 or inp.M2 or inp.Kick or inp.Sheath or inp.Incant or f.DrawKind ~= nil or f.IncantT ~= nil
+		or f.Caps.Kneeling
 	if f.BowT then
 		f.BowT += dt
 		if f.BowT >= Bow.Total or not still or busy then

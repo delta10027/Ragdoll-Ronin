@@ -38,6 +38,8 @@ local Dismemberment = require(Modules.Dismemberment)
 local OwnerSync = require(Modules.OwnerSync)
 local KickResolver = require(Modules.KickResolver)
 local SoundFX = require(Modules.SoundFX)
+local Loadout = require(Modules.Loadout)
+local Incantations = require(Modules.Incantations)
 local Runtime = require(Shared.Sim.Runtime)
 local SimState = require(Shared.Sim.SimState)
 
@@ -48,6 +50,8 @@ DebugService.Init()
 OwnerSync.Init()
 SoundFX.Init()
 CombatResolver.SetKill(Lifecycle.Kill)
+Incantations.SetKill(Lifecycle.Kill)
+Loadout.Init()
 NetService.SetReset(function(f)
 	Lifecycle.Kill(f, "Reset")
 end)
@@ -193,6 +197,10 @@ local function guardOwnership()
 end
 
 RunService.Heartbeat:Connect(function(dt)
+	-- incantations (cast, burning blade, burning wounds)
+	for _, f in ipairs(Registry.List()) do
+		guarded(f, "incantation", Incantations.Step, f, dt)
+	end
 	-- Owner mode: tell each owner what combat decided about their fighter this frame
 	for _, f in ipairs(Registry.List()) do
 		if OwnerSync.Applies(f) then

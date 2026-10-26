@@ -21,6 +21,7 @@ function Input.Neutral()
 		Crouch = false, -- CTRL held
 		Sheath = false, -- 1 (draw / sheathe), a tap held a few frames like the kick
 		Bow = false, -- G (rei), a tap held like the kick
+		Incant = false, -- J (incantation), a tap held like the kick
 		Seq = 0,
 		LastPacket = 0,
 	}

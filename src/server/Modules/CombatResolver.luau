@@ -4,7 +4,10 @@
 	Strike power (no client-supplied numbers anywhere):
 	  power = PowerScale * (relSpeed / RefSpeed)^2 * commitment * weapon * strokeEnergy * attackerStrength
 	  relSpeed   = blade point velocity (from the sweep) minus the target surface velocity
-	  commitment = stroke tip travel / CommitmentDistance (short flicks are weak)
+	  commitment = momentum arc / CommitmentDistance: how far the tip really travelled over the last
+	               MomentumWindow (SwordController.Track). Short flicks are weak, and a fast spin
+	               of the sword round a small circle (all speed, no distance) does no damage at all
+	               below MinMomentumArc
 	  strokeEnergy drops after every block, glance or body it passes through
 	Contact classification:
 	  Thrust - moving along the blade axis and contact near the tip
@@ -41,6 +44,8 @@ local Feedback = require(script.Parent.Feedback)
 local DebugService = require(script.Parent.DebugService)
 local HitDetection = require(script.Parent.HitDetection)
 local SoundFX = require(script.Parent.SoundFX)
+local Armor = require(script.Parent.Armor)
+local Incantations = require(script.Parent.Incantations)
 
 local CombatResolver = {}
 local C = Config.Combat
@@ -55,8 +60,9 @@ function CombatResolver.SetKill(fn)
 end
 
 local function strikePower(att, stroke, relSpeed)
-	local commitment = math.clamp(stroke.Distance / C.CommitmentDistance, C.MinCommitment, 1)
+	local commitment = math.clamp((att.Attack.Arc or 0) / C.CommitmentDistance, C.MinCommitment, 1)
 	local p = C.PowerScale * (relSpeed / C.RefSpeed) ^ 2 * commitment * Config.Sword.WeaponFactor * stroke.EnergyMult * att.Caps.Strength
+		* Incantations.PowerMult(att)
 	return math.min(p, C.MaxPower), commitment
 end
 
@@ -277,11 +283,46 @@ local function resolveBodyHit(att, target, h)
 	DebugService.Attr(att, "LastContact", string.format("%s %s v=%.0f", target.Name, segName, speed))
 	DebugService.Attr(att, "LastTargetSegment", segName)
 
+	local arc = att.Attack.Arc or 0
+	if arc < C.MinMomentumArc then
+		stroke.EnergyMult *= 0.9
+		DebugService.Hit("%s -> %s %s: no momentum (arc %.2f < %.2f studs)", att.Name, target.Name, segName, arc, C.MinMomentumArc)
+		Feedback.Send(att, "Contact", { Segment = segName })
+		return "Continue"
+	end
 	if power < C.MinDamagingPower then
 		stroke.EnergyMult *= 0.9
 		DebugService.Hit("%s -> %s %s: too weak to damage (power %.2f < %.2f, speed %.0f)", att.Name, target.Name, segName, power, C.MinDamagingPower, speed)
 		Feedback.Send(att, "Contact", { Segment = segName })
 		return "Continue"
+	end
+
+	target.LastHurtTime = os.clock() -- (Loadout: no putting armour on mid-fight)
+
+	-- armour: the blade is stopped; only part of the blow reaches the body, as a blunt one
+	local piece = Armor.Covering(target, segName)
+	if piece then
+		local broke = Armor.Strike(target, piece)
+		local through = power * Config.Armor.PowerThrough
+		AnatomyService.ApplyStrike(target, {
+			Segment = segName,
+			Part = h.Part,
+			Position = h.Position,
+			Direction = dir,
+			BladeAxis = blade.YVector,
+			Power = through,
+			Kind = "Blunt",
+			Quality = C.BluntQuality,
+		})
+		local reaction = react(att, target, h, dir, power * 0.6, segName)
+		deflect(att, -dir, C.DeflectDV * 0.5)
+		SoundFX.Play(broke and "ArmorBreak" or "ArmorHit", h.Position)
+		local label = Config.Armor.Pieces[piece].Label
+		Feedback.Send(att, broke and "EnemyArmorBroken" or "ArmorStopped", { Label = label })
+		Feedback.Send(target, broke and "ArmorBroken" or "ArmorHeld", { Label = label })
+		DebugService.Hit("  -> stopped by %s (%s), %s", label, broke and "BROKEN" or (target.Armor[piece] .. " hits left"), tostring(reaction))
+		DebugService.Attr(target, "LastInjury", (broke and "Armour broken: " or "Armour held: ") .. label)
+		return "Stop"
 	end
 
 	DebugService.Hit("%s -> %s %s: %s power %.1f quality %.2f", att.Name, target.Name, segName, kind, power, quality)
@@ -300,6 +341,7 @@ local function resolveBodyHit(att, target, h)
 	if strike.Outcome ~= "Stopped" then
 		BloodFX.Source(target, segName, h.Part, CFrame.new(h.Position))
 		BloodFX.Burst(h.Part, h.Position, strike.Damage * 0.5)
+		Incantations.OnWound(att, target, segName, h.Part) -- a burning blade sets the wound alight
 	end
 
 	local severed = nil
