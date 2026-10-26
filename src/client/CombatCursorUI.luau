@@ -162,6 +162,10 @@ local MESSAGES = {
 	Interrupted = { "INTERRUPTED", COLORS.Swing },
 	KnockedDown = { "KNOCKED DOWN", COLORS.Swing },
 	Contact = { "touch", Color3.fromRGB(200, 200, 200) },
+	KickLanded = { "TEEP!", Color3.fromRGB(255, 200, 90) },
+	KickBlocked = { "TEEP CHECKED", COLORS.Guard },
+	Kicked = { "KICKED BACK", COLORS.Swing },
+	BlockedKick = { "TEEP BLOCKED", COLORS.Guard },
 }
 
 function CombatCursorUI.Flash(ctx, kind, info)

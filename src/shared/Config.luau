@@ -261,6 +261,41 @@ Config.Combat = {
 	BluntQuality = 0.45,
 }
 
+-- Teep (C): a Muay Thai push kick with the lead (left) leg. The knee comes up to the chest with the
+-- foot tucked under it, the hips drive forward and the leg extends straight into the opponent's
+-- belly, sole first and toes pulled back, with the torso leaning back to counterbalance and the
+-- hands kept up in guard; then the knee snaps back to the chamber and the foot steps down.
+-- It pushes rather than hurts: a clean teep shoves the target back and staggers it. Only a flat
+-- guard held close to the centre of the circle (the cross block in front of the chin) stops it.
+Config.Kick = {
+	Leg = "Left",
+	ChamberTime = 0.16, -- knee up
+	ExtendTime = 0.12, -- leg out
+	HoldTime = 0.1, -- fully extended
+	RetractTime = 0.24, -- back to the chamber, then the foot down
+	Cooldown = 0.35, -- after the kick before the next one
+	-- poses (degrees): hip flexion, knee bend, ankle (toes up +) relative to the pelvis
+	Chamber = { Hip = 108, Knee = 115, Ankle = 25 },
+	Extend = { Hip = 86, Knee = 6, Ankle = 6 }, -- with the lean: thigh ~12 deg above level, sole square to the target
+	Lean = 16, -- pelvis/torso lean back while extended (degrees)
+	SupportKnee = 10, -- standing leg knee bend
+	LungeSpeed = 7, -- studs/s forward drive of the hips while extending
+	MoveMult = 0.25, -- walking speed while kicking
+	HandsGrip = Vector3.new(0.05, 0.35, -1.15), -- sword held up in guard (upper-torso space, unscaled)
+	HandsBlade = Vector3.new(-0.1, 0.85, -0.5),
+	-- contact (server KickResolver)
+	ActiveReach = 1.5 * S, -- foot this far in front of the pelvis: the kick can land
+	FootRadius = 0.6 * S,
+	KnockbackDV = 15, -- studs/s given to the whole body of a target the kick lands on
+	KnockbackUp = 2,
+	HitStaggerTime = 0.6,
+	HitBalanceCost = 30,
+	BlockMaxRadius = 0.45, -- guard cursor radius: only a flat block this close to the centre stops a teep
+	BlockedPushDV = 5, -- a blocked teep still nudges the defender
+	BlockedBalanceCost = 8,
+	BlockedStaggerTime = 0.3, -- the kicker, bounced off the guard
+}
+
 Config.Block = {
 	Strength = 16,
 	ParryWindow = 0.3,

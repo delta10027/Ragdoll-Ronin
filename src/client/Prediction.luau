@@ -122,7 +122,7 @@ local function ownerInput(ctx, f)
 		i.Move = s.Move
 		i.Yaw = ctx.Camera and ctx.Camera.Yaw or i.Yaw
 		i.AimU, i.AimV = s.AimU, s.AimV
-		i.M1, i.M2 = s.M1, s.M2
+		i.M1, i.M2, i.Kick = s.M1, s.M2, s.Kick
 	end
 	return i
 end
@@ -139,6 +139,7 @@ local function ownerStep(ctx, dt)
 		f.Attack.RecoilUntil = 0
 		f.Attack.ReleaseTime = nil
 		f.Block.StartTime = 0
+		f.KickReadyAt = 0
 	end
 	applyServerEvents(f)
 	if state.RecoverPending then

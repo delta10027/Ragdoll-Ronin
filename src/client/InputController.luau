@@ -7,7 +7,8 @@
 	  * M1 held: mouse moves the combat cursor (unit disk) -> continuous sword control
 	  * M2 held: mouse moves the combat cursor -> guard placement
 	  * releasing both: the cursor relaxes back to the ready stance (the server does the same)
-	Packet: seq, moveX, moveZ, yaw, aimU, aimV, buttons (bit0 = M1, bit1 = M2)
+	  * C: teep (push kick). A tap is held for KICK_HOLD seconds so the simulation always sees it.
+	Packet: seq, moveX, moveZ, yaw, aimU, aimV, buttons (bit0 = M1, bit1 = M2, bit2 = kick)
 ]]
 local UserInputService = game:GetService("UserInputService")
 local GuiService = game:GetService("GuiService")
@@ -21,6 +22,7 @@ local SwordController = require(Sim:WaitForChild("SwordController"))
 
 local InputController = {}
 local A = Config.Aim
+local KICK_HOLD = 0.12
 
 function InputController.Init(ctx)
 	local s = {
@@ -28,6 +30,8 @@ function InputController.Init(ctx)
 		AimV = A.ReadyV,
 		M1 = false,
 		M2 = false,
+		Kick = false,
+		KickUntil = 0,
 		Move = Vector3.zero,
 		History = {},
 		Seq = 0,
@@ -52,6 +56,8 @@ function InputController.Init(ctx)
 			if ctx.Prediction and ctx.Prediction.Owner then
 				ctx.Prediction.RecoverPending = true -- this client runs its own fighter (Owner mode)
 			end
+		elseif io.KeyCode == Enum.KeyCode.C then
+			s.KickUntil = os.clock() + KICK_HOLD
 		elseif io.KeyCode == Enum.KeyCode.V then
 			CameraController.ToggleFront(ctx)
 		end
@@ -76,6 +82,7 @@ function InputController.Update(ctx, dt)
 		s.M1, s.M2 = false, false
 	end
 
+	s.Kick = not blocked and os.clock() < s.KickUntil
 	local delta = blocked and Vector2.zero or UserInputService:GetMouseDelta()
 	if s.M1 or s.M2 then
 		s.AimU += delta.X * A.ClientSensitivity
@@ -116,12 +123,12 @@ function InputController.Update(ctx, dt)
 	-- server authority: intent goes through InputActions every frame (predicted locally, replayed
 	-- on the server) instead of the RemoteEvent
 	if Runtime.ServerAuthority then
-		SimInput.Fire(ctx.Player, s.Move, ctx.Camera.Yaw, s.AimU, s.AimV, s.M1, s.M2)
+		SimInput.Fire(ctx.Player, s.Move, ctx.Camera.Yaw, s.AimU, s.AimV, s.M1, s.M2, s.Kick)
 		return
 	end
 
 	-- a button press/release goes out immediately instead of waiting for the next send slot
-	local buttons = (s.M1 and 1 or 0) + (s.M2 and 2 or 0)
+	local buttons = (s.M1 and 1 or 0) + (s.M2 and 2 or 0) + (s.Kick and 4 or 0)
 	if buttons ~= s.LastButtons or now - s.LastSend >= 1 / Config.Network.ClientSendRate then
 		s.LastButtons = buttons
 		s.LastSend = now

@@ -21,6 +21,7 @@ local StateDefs = require(Shared.StateDefs)
 local Util = require(script.Parent.Util)
 local StateMachine = require(script.Parent.StateMachine)
 local Runtime = require(script.Parent.Runtime)
+local Kick = require(script.Parent.Kick)
 
 local BalanceController = {}
 
@@ -196,6 +197,23 @@ function BalanceController.Update(f, dt, inp)
 			if f.Balance >= B.RecoverAt * caps.BalanceMax then
 				StateMachine.Set(f, "Idle", "Regained balance")
 			end
+			return
+		elseif st == "Kicking" then
+			f.KickHeld = inp.Kick == true
+			if StateMachine.Elapsed(f) >= Kick.Total then
+				f.KickReadyAt = now + Config.Kick.Cooldown
+				StateMachine.Set(f, inp.Move.Magnitude > 0.1 and "Moving" or "Idle", "Kick done")
+			end
+			return
+		end
+
+		-- teep on a fresh press of C, standing on both legs with the kicking leg whole
+		local pressed = inp.Kick == true and not f.KickHeld
+		f.KickHeld = inp.Kick == true
+		local leg = Kick.Leg
+		if pressed and now >= (f.KickReadyAt or 0) and not caps.Kneeling and caps.LegSupport >= 0.6
+			and (caps["Leg" .. leg] or 0) >= 0.5 and f.Parts[leg .. "Foot"] then
+			StateMachine.Set(f, "Kicking", "Teep")
 			return
 		end
 

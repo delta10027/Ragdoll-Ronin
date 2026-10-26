@@ -18,6 +18,8 @@ local Util = require(script.Parent.Util)
 local Runtime = require(script.Parent.Runtime)
 local BodyShape = require(script.Parent.BodyShape)
 local Spacing = require(script.Parent.Spacing)
+local Kick = require(script.Parent.Kick)
+local StateMachine = require(script.Parent.StateMachine)
 
 local MotorController = {}
 
@@ -31,6 +33,7 @@ local TONE = {
 	Moving = { Body = 1, Arm = 1, Upright = 1, Support = 1, Move = 1 },
 	Attacking = { Body = 1, Arm = 1, Upright = 1, Support = 1, Move = M.AttackSpeedMult },
 	Blocking = { Body = 1, Arm = 1, Upright = 1, Support = 1, Move = M.BlockSpeedMult },
+	Kicking = { Body = 1, Arm = 1, Upright = 1, Support = 1, Move = Config.Kick.MoveMult },
 	Staggered = { Body = 0.8, Arm = 0.45, Upright = 0.75, Support = 1, Move = M.StaggerSpeedMult, Accel = M.StaggerAcceleration },
 	OffBalance = { Body = 0.85, Arm = 0.7, Upright = 0.45, Support = 1, Move = M.OffBalanceSpeedMult, Accel = M.StaggerAcceleration },
 	Falling = { Body = 0.06, Arm = 0.05, Upright = 0, Support = 0, Move = 0 },
@@ -542,6 +545,22 @@ local function uprightPose(f, dt)
 	else
 		standLegs(f, dt, pose)
 	end
+	if st == "Kicking" then
+		-- teep: blend the stance into the kick leg pose as the knee comes up (Sim.Kick)
+		local lift, ext = Kick.Phase(StateMachine.Elapsed(f))
+		local lean = rad(Config.Kick.Lean) * ext
+		local kick = {}
+		Kick.LegPose(kick, ext, lean)
+		local legs = {}
+		for k in pairs(kick) do
+			legs[k] = pose[k]
+		end
+		for k, v in pairs(blendPose(legs, kick, lift)) do
+			pose[k] = v
+		end
+		-- the head stays level and on the target while the body leans back
+		pose.NeckBase = pose.NeckBase * CFrame.Angles(-lean * 0.6, 0, 0)
+	end
 	armPose(f, pose)
 	return pose
 end
@@ -597,7 +616,16 @@ function MotorController.Apply(f, dt, inp)
 	if StateDefs.Upright[st] then
 		vel = Spacing.Adjust(f, vel)
 	end
-	f.CommandedVelocity = vel
+	local kickLift, kickExt, kickDrive = 0, 0, false
+	if st == "Kicking" then
+		kickLift, kickExt, kickDrive = Kick.Phase(StateMachine.Elapsed(f))
+		if kickDrive then
+			-- the hips drive forward into the push (allowed into the other fighter's space: that
+			-- is the point of the teep)
+			vel += Vector3.new(-math.sin(f.FacingYaw), 0, -math.cos(f.FacingYaw)) * Config.Kick.LungeSpeed
+		end
+	end
+	f.CommandedVelocity = st == "Kicking" and Vector3.zero or vel -- (no walking gait under the kick)
 
 	-- 1. joints (the sword target first turns toward this step's request at a capped rate)
 	if f.SwordTargetCF then
@@ -637,7 +665,7 @@ function MotorController.Apply(f, dt, inp)
 	local Dr = f.Drives
 	local pelvis = f.Parts.LowerTorso
 	if StateDefs.Upright[st] then
-		local rate = (st == "Attacking" or st == "Blocking") and M.AttackTurnRate or M.TurnRate
+		local rate = (st == "Attacking" or st == "Blocking" or st == "Kicking") and M.AttackTurnRate or M.TurnRate
 		f.FacingYaw = Util.approachAngle(f.FacingYaw, inp.Yaw, rate * dt)
 	elseif st == "Recovering" then
 		f.FacingYaw = f.StateData.Yaw or f.FacingYaw
@@ -648,6 +676,10 @@ function MotorController.Apply(f, dt, inp)
 		if axis.Magnitude > 1e-3 then
 			leanCF = CFrame.fromAxisAngle(axis.Unit, rad(14))
 		end
+	elseif st == "Kicking" and kickExt > 0 then
+		-- lean back against the extended leg (about the facing's right axis: + tips the top back)
+		local right = Vector3.new(math.cos(f.FacingYaw), 0, -math.sin(f.FacingYaw))
+		leanCF = CFrame.fromAxisAngle(right, rad(Config.Kick.Lean) * kickExt)
 	end
 	local hipTwist = StateDefs.Upright[st] and f.Aim and f.Aim.Twist * Config.Aim.HipTwist or 0
 	setCF(f, Dr.Upright, "CFrame", leanCF * CFrame.Angles(0, f.FacingYaw + hipTwist, 0), 1, rad(0.5))

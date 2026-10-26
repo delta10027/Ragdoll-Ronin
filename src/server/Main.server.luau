@@ -6,7 +6,8 @@
 	  them, see OwnerSync); under server authority (Workspace.AuthorityMode = Server) inside
 	  RunService:BindToSimulation, so the owning client can run the same step to predict its own
 	  fighter (see Shared.Sim.SimState). Validation, disarming and debug then run on Heartbeat.
-	PostSimulation (after physics):  blade stroke tracking -> swept hit detection -> combat resolution
+	PostSimulation (after physics):  blade stroke tracking -> swept hit detection -> combat resolution,
+	  then kicks (KickResolver)
 	Bleeding runs on its own bounded interval; anatomy snapshots are pushed to owners at a fixed rate.
 	Each fighter is updated inside pcall so one broken fighter cannot stop combat for everyone.
 ]]
@@ -35,6 +36,7 @@ local DevTools = require(Modules.DevTools)
 local TestDummies = require(Modules.TestDummies)
 local Dismemberment = require(Modules.Dismemberment)
 local OwnerSync = require(Modules.OwnerSync)
+local KickResolver = require(Modules.KickResolver)
 local Runtime = require(Shared.Sim.Runtime)
 local SimState = require(Shared.Sim.SimState)
 
@@ -139,6 +141,7 @@ local function stepPost(f, dt)
 			CombatResolver.Process(f, hits)
 		end
 	end
+	KickResolver.Step(f)
 end
 
 if Runtime.ServerAuthority then

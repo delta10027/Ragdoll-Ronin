@@ -103,6 +103,8 @@ field(UT, "StrokeActive", function(f) return f.Attack.Stroke ~= nil or f.Attack.
 	f.Attack.StrokeActive = v == true
 end)
 field(UT, "RecoilUntil", function(f) return f.Attack.RecoilUntil end, function(f, v) f.Attack.RecoilUntil = v or 0 end)
+field(LT, "KickHeld", function(f) return f.KickHeld end, function(f, v) f.KickHeld = v == true end)
+field(LT, "KickReadyAt", function(f) return f.KickReadyAt end, function(f, v) f.KickReadyAt = v or 0 end)
 -- motor controller memory
 field(UT, "LimbsCollide", function(f) return f.LimbsCollide end, function(f, v) f.LimbsCollide = v end)
 field(UT, "OffHandFree", function(f) return f.OffHandFree end, function(f, v) f.OffHandFree = v == true end)
