@@ -17,6 +17,14 @@ Config.Debug = {
 	ContactMarkerLifetime = 1.5,
 	AttributeRate = 10, -- Hz for high-frequency debug attributes (sword speed)
 	DevToolsInStudio = true, -- ServerStorage.RR_DevCommand bindable (Studio only)
+	TestDummies = true, -- spawn a line of respawning practice dummies when the first player joins (server TestDummies)
+	TestDummyLine = { Distance = 22, Spacing = 8 }, -- studs in front of the spawn (-Z), studs between dummies
+	TestDummyTiming = {
+		StartDelay = 2, -- seconds after spawning before a dummy starts its behaviour (it stands up first)
+		SwingPeriod = 3, -- one swing every this many seconds
+		WindupTime = 0.8, -- holding the wind-up
+		CutHoldTime = 0.6, -- holding the end of the cut before letting go
+	},
 }
 
 Config.Network = {

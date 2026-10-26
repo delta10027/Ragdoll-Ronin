@@ -49,7 +49,8 @@ local function spawnCFrame(position)
 	return CFrame.new(ground) * CFrame.Angles(0, yaw, 0), yaw
 end
 
--- opts: { Name, Position, Yaw, RespawnDummy }
+-- opts: { Name, Position, Yaw, RespawnDummy, Behavior, Label }. A respawning dummy comes back with the
+-- same opts (same place, facing and behaviour, see TestDummies).
 function Lifecycle.Spawn(player, opts)
 	opts = opts or {}
 	local cf, yaw = spawnCFrame(opts.Position)
@@ -68,6 +69,9 @@ function Lifecycle.Spawn(player, opts)
 		Player = player,
 		IsDummy = player == nil,
 		RespawnDummy = opts.RespawnDummy,
+		SpawnOpts = opts,
+		SpawnYaw = yaw,
+		Behavior = opts.Behavior,
 		Model = data.Model,
 		Parts = data.Parts,
 		DetachedParts = {},
@@ -92,6 +96,25 @@ function Lifecycle.Spawn(player, opts)
 	SwordController.Init(f)
 	StateMachine.Init(f)
 
+	if opts.Label then
+		local head = data.Parts.Head
+		local gui = Instance.new("BillboardGui")
+		gui.Name = "Label"
+		gui.Size = UDim2.fromOffset(170, 26)
+		gui.StudsOffsetWorldSpace = Vector3.new(0, 1.6, 0)
+		gui.AlwaysOnTop = true
+		gui.MaxDistance = 80
+		local text = Instance.new("TextLabel")
+		text.Size = UDim2.fromScale(1, 1)
+		text.BackgroundTransparency = 1
+		text.TextColor3 = Color3.new(1, 1, 1)
+		text.TextStrokeTransparency = 0.3
+		text.Font = Enum.Font.GothamMedium
+		text.TextSize = 15
+		text.Text = opts.Label
+		text.Parent = gui
+		gui.Parent = head
+	end
 	data.Model.Parent = workspace
 	CharacterBuilder.ClaimOwnership(data.Model)
 	Registry.Add(f)
@@ -163,7 +186,7 @@ function Lifecycle.Respawn(f)
 	if player and player.Parent then
 		Lifecycle.Spawn(player)
 	elseif respawnDummy then
-		Lifecycle.Spawn(nil, { Name = name, RespawnDummy = true })
+		Lifecycle.Spawn(nil, f.SpawnOpts or { Name = name, RespawnDummy = true })
 	end
 end
 

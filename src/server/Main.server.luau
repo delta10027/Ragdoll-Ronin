@@ -31,6 +31,7 @@ local Lifecycle = require(Modules.Lifecycle)
 local NetService = require(Modules.NetService)
 local DebugService = require(Modules.DebugService)
 local DevTools = require(Modules.DevTools)
+local TestDummies = require(Modules.TestDummies)
 local Dismemberment = require(Modules.Dismemberment)
 local Runtime = require(Shared.Sim.Runtime)
 local SimState = require(Shared.Sim.SimState)
@@ -60,6 +61,7 @@ DevTools.Init({
 	KnockDown = BalanceController.KnockDown,
 })
 Lifecycle.Init()
+TestDummies.Init({ Spawn = Lifecycle.Spawn })
 
 ------------------------------------------------------------------ error isolation
 local lastError = {}
