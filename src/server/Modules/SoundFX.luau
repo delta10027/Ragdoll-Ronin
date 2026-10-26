@@ -1,7 +1,8 @@
 --[[
 	SoundFX: positional combat sounds from Config.Sounds (slots: Slash, Block, Parry, Clash, Cut,
-	Sever, Decapitation, KickLanded, KickBlocked). Played by the server at the place it happens, on
-	an attachment under Terrain, so every client nearby hears it; cleaned up when it ends.
+	Sever, Decapitation, KickLanded, KickBlocked). The server picks the sound and tells every client
+	(SoundEvent remote); each client plays it where it happens (client SoundPlayer, which preloads
+	every id when it starts).
 	A slot with no ids uses its Fallback slot, or plays nothing.
 	Every id is preloaded at startup. One that fails to load is reported in the output
 	("[RR] sound ... failed to load") and skipped from then on, so the slot uses its other ids or
@@ -15,6 +16,7 @@ local Runtime = require(ReplicatedStorage.RagdollRonin.Sim.Runtime)
 
 local SoundFX = {}
 local SND = Config.Sounds
+local remote = ReplicatedStorage.RagdollRonin.Remotes.SoundEvent
 local lastSlash = setmetatable({}, { __mode = "k" })
 local failed = {} -- asset id string -> true once it failed to load
 
@@ -60,27 +62,11 @@ function SoundFX.Play(name, position)
 		return false
 	end
 	local id = ids[math.random(1, #ids)]
-	local att = Instance.new("Attachment")
-	att.Name = "RR_Sound_" .. name
-	att.WorldPosition = position
-	local s = Instance.new("Sound")
-	s.SoundId = id
-	s.Volume = slot.Volume or 1
 	local lo, hi = slot.PitchMin or 1, slot.PitchMax or 1
-	s.PlaybackSpeed = lo + (hi - lo) * math.random()
-	s.RollOffMode = Enum.RollOffMode.InverseTapered
-	s.RollOffMaxDistance = SND.RollOffMaxDistance or 120
-	s.Parent = att
-	att.Parent = workspace.Terrain
-	s.Ended:Once(function()
-		att:Destroy()
-	end)
-	task.delay(10, function() -- (never loaded, or never ended)
-		if att.Parent then
-			att:Destroy()
-		end
-	end)
-	s:Play()
+	-- every client plays it itself (client SoundPlayer): a sound the server creates is deleted
+	-- when the server thinks it has finished, which for a short sound is before a client that is
+	-- still downloading it ever plays it
+	remote:FireAllClients(id, position, slot.Volume or 1, lo + (hi - lo) * math.random())
 	return true
 end
 

@@ -21,6 +21,7 @@ local CombatCursorUI = require(script.CombatCursorUI)
 local AnatomyUI = require(script.AnatomyUI)
 local DebugOverlay = require(script.DebugOverlay)
 local Prediction = require(script.Prediction)
+local SoundPlayer = require(script.SoundPlayer)
 
 -- default Roblox movement controls are irrelevant for the custom fighter
 task.spawn(function()
@@ -86,6 +87,7 @@ InputController.Init(ctx)
 CombatCursorUI.Init(ctx)
 AnatomyUI.Init(ctx)
 DebugOverlay.Init(ctx)
+SoundPlayer.Init(ctx)
 onCharacter(player.Character)
 
 RunService:BindToRenderStep("RR_Input", Enum.RenderPriority.Input.Value + 1, function(dt)
