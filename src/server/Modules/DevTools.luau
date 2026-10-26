@@ -195,6 +195,15 @@ function DevTools.Init(api)
 				f.Model:PivotTo(b)
 			end
 			return true
+		elseif cmd == "playSound" then
+			-- playSound(slot name[, fighter id]): play a Config.Sounds slot at a fighter (default: a player's)
+			local f = b and Registry.ById[b]
+			if not f then
+				local p = Players:GetPlayers()[1]
+				f = p and Registry.ByPlayer[p]
+			end
+			local at = f and f.Parts.UpperTorso and f.Parts.UpperTorso.Position or Vector3.new(0, 5, 0)
+			return require(script.Parent.SoundFX).Play(a, at)
 		elseif cmd == "setDebug" then
 			workspace:SetAttribute("RR_Debug", a == true)
 			return true
