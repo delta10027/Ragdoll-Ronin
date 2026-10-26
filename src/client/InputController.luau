@@ -8,7 +8,9 @@
 	  * M2 held: mouse moves the combat cursor -> guard placement
 	  * releasing both: the cursor relaxes back to the ready stance (the server does the same)
 	  * C: teep (push kick). A tap is held for KICK_HOLD seconds so the simulation always sees it.
-	Packet: seq, moveX, moveZ, yaw, aimU, aimV, buttons (bit0 = M1, bit1 = M2, bit2 = kick)
+	  * CTRL (held): crouch
+	  * 1: draw / sheathe the sword (CombatAction "Sheath")
+	Packet: seq, moveX, moveZ, yaw, aimU, aimV, buttons (bit0 = M1, bit1 = M2, bit2 = kick, bit3 = crouch)
 ]]
 local UserInputService = game:GetService("UserInputService")
 local GuiService = game:GetService("GuiService")
@@ -32,6 +34,7 @@ function InputController.Init(ctx)
 		M2 = false,
 		Kick = false,
 		KickUntil = 0,
+		Crouch = false,
 		Move = Vector3.zero,
 		History = {},
 		Seq = 0,
@@ -58,6 +61,8 @@ function InputController.Init(ctx)
 			end
 		elseif io.KeyCode == Enum.KeyCode.C then
 			s.KickUntil = os.clock() + KICK_HOLD
+		elseif io.KeyCode == Enum.KeyCode.One then
+			ctx.Remotes.CombatAction:FireServer("Sheath")
 		elseif io.KeyCode == Enum.KeyCode.V then
 			CameraController.ToggleFront(ctx)
 		end
@@ -83,6 +88,7 @@ function InputController.Update(ctx, dt)
 	end
 
 	s.Kick = not blocked and os.clock() < s.KickUntil
+	s.Crouch = not blocked and (UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.RightControl))
 	local delta = blocked and Vector2.zero or UserInputService:GetMouseDelta()
 	if s.M1 or s.M2 then
 		s.AimU += delta.X * A.ClientSensitivity
@@ -123,12 +129,12 @@ function InputController.Update(ctx, dt)
 	-- server authority: intent goes through InputActions every frame (predicted locally, replayed
 	-- on the server) instead of the RemoteEvent
 	if Runtime.ServerAuthority then
-		SimInput.Fire(ctx.Player, s.Move, ctx.Camera.Yaw, s.AimU, s.AimV, s.M1, s.M2, s.Kick)
+		SimInput.Fire(ctx.Player, s.Move, ctx.Camera.Yaw, s.AimU, s.AimV, s.M1, s.M2, s.Kick, s.Crouch)
 		return
 	end
 
 	-- a button press/release goes out immediately instead of waiting for the next send slot
-	local buttons = (s.M1 and 1 or 0) + (s.M2 and 2 or 0) + (s.Kick and 4 or 0)
+	local buttons = (s.M1 and 1 or 0) + (s.M2 and 2 or 0) + (s.Kick and 4 or 0) + (s.Crouch and 8 or 0)
 	if buttons ~= s.LastButtons or now - s.LastSend >= 1 / Config.Network.ClientSendRate then
 		s.LastButtons = buttons
 		s.LastSend = now

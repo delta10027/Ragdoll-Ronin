@@ -113,6 +113,7 @@ field(UT, "ArmRollR", function(f) return f.ArmState and f.ArmState.Roll end, fun
 field(UT, "ArmSwivelL", function(f) return f.ArmState and f.ArmState.SwivelL end, function(f, v) f.ArmState.SwivelL = v or 0 end)
 -- server-only inputs to the simulation
 field(UT, "TotalMass", function(f) return f.TotalMass end, function(f, v) f.TotalMass = v or 1 end, true)
+field(UT, "Sheathed", function(f) return f.Sheathed == true end, function(f, v) f.Sheathed = v == true end, true)
 local CAP_KEYS = { "LegLeft", "LegRight", "LegSupport", "SwordArm", "OffArm", "Grip", "Strength", "Move", "Stability", "BalanceRegen", "BalanceMax", "Kneeling", "Incapacitated" }
 for _, key in ipairs(CAP_KEYS) do
 	field(UT, "Cap_" .. key, function(f) return f.Caps[key] end, function(f, v) f.Caps[key] = v end, true)

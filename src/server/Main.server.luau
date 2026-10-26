@@ -86,7 +86,7 @@ end
 
 -- a crippled sword hand cannot hold the katana, however it was injured
 local function checkDisarm(f)
-	if f.Sword and not f.Dead and f.Anatomy.Segments.RightHand.Integrity < Config.Anatomy.DisarmHandIntegrity then
+	if f.Sword and not f.Sheathed and not f.Dead and f.Anatomy.Segments.RightHand.Integrity < Config.Anatomy.DisarmHandIntegrity then
 		Dismemberment.DropSword(f, f.Parts.UpperTorso and f.Parts.UpperTorso.CFrame.LookVector * 6)
 	end
 end

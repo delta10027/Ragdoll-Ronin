@@ -311,7 +311,7 @@ local function resolveBodyHit(att, target, h)
 		end
 	end
 	-- crippled sword hand loses the sword (also enforced every frame in Main)
-	if target.Sword and target.Anatomy.Segments.RightHand.Integrity < Config.Anatomy.DisarmHandIntegrity then
+	if target.Sword and not target.Sheathed and target.Anatomy.Segments.RightHand.Integrity < Config.Anatomy.DisarmHandIntegrity then
 		Dismemberment.DropSword(target, dir * 8)
 	end
 

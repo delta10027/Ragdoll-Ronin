@@ -99,7 +99,7 @@ function OwnerSync.Report(f, r)
 	if not r.Bound then
 		aim.Bind = nil
 	end
-	local blocking = r.Block and f.State == "Blocking" and f.Sword ~= nil
+	local blocking = r.Block and f.State == "Blocking" and f.Sword ~= nil and not f.Sheathed
 	if blocking ~= f.Block.Active then
 		f.Block.Active = blocking
 		if blocking then

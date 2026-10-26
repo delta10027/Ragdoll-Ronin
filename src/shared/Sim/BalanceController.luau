@@ -137,6 +137,9 @@ function BalanceController.Update(f, dt, inp)
 
 	-- stance height (rate limited: a sudden drop of the spring target makes the body dive)
 	local crouch = (st == "Attacking" or st == "Blocking") and 0.97 or 1
+	if inp.Crouch and StateDefs.Upright[st] then
+		crouch = M.CrouchHeightFactor -- CTRL (the legs follow the height, MotorController.standLegs)
+	end
 	local desiredHeight = M.StandHeight * (caps.Kneeling and M.KneelHeightFactor or 1) * crouch
 	local maxStep = M.HeightChangeRate * dt
 	f.TargetHeight += math.clamp(desiredHeight - f.TargetHeight, -maxStep, maxStep)
@@ -218,7 +221,7 @@ function BalanceController.Update(f, dt, inp)
 		end
 
 		-- controllable states follow intent
-		local canSword = f.Sword ~= nil and caps.SwordArm > 0.05
+		local canSword = f.Sword ~= nil and not f.Sheathed and caps.SwordArm > 0.05
 		local want
 		if inp.M2 and canSword then
 			want = "Blocking"

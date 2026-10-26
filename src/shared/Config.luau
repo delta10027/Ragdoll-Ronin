@@ -83,7 +83,15 @@ Config.Movement = {
 	StrideLength = 3.0 * S,
 	GaitHipAmplitude = math.rad(30),
 	GaitKneeAmplitude = math.rad(50),
-	StanceKneeBend = math.rad(16),
+	StanceKneeBend = math.rad(16), -- least knee bend; more when the pelvis is lower (crouch, pushed down)
+	CrouchHeightFactor = 0.78, -- CTRL: stance height while crouching
+	CrouchSpeedMult = 0.5,
+	-- leg geometry for the standing knee bend (studs, scaled): hip pivot below the pelvis centre,
+	-- thigh and shin lengths, ankle pivot to sole
+	HipDrop = 0.45 * S,
+	ThighLength = 1.45 * S,
+	ShinLength = 1.45 * S,
+	AnkleToSole = 0.3 * S,
 }
 
 Config.Drives = {
@@ -296,6 +304,14 @@ Config.Kick = {
 	BlockedStaggerTime = 0.3, -- the kicker, bounced off the guard
 }
 
+-- Sheathing (1): players spawn with the katana in its saya on the left hip
+Config.Sheath = {
+	StartSheathed = true, -- players' fighters (dummies always spawn with the sword drawn)
+	Mouth = Vector3.new(-0.9, 0.05, -0.5), -- scabbard mouth, pelvis space (unscaled; +X right, -Z forward)
+	BladeDir = Vector3.new(-0.12, -0.38, 0.92), -- the scabbard runs back and down from the mouth
+	Color = Color3.fromRGB(28, 22, 24),
+}
+
 -- Sound effects (server SoundFX). Put Roblox audio asset ids in Ids, as numbers or
 -- "rbxassetid://..." strings; with several, one is picked at random each time. A slot left empty
 -- plays nothing, or its Fallback slot's sound. Played in the world where it happens, so everyone
@@ -310,6 +326,8 @@ Config.Sounds = {
 	Decapitation = { Ids = { 140325083438865 }, Volume = 1, PitchMin = 0.95, PitchMax = 1.05, Fallback = "Sever" },
 	KickLanded = { Ids = { 135240815029802 }, Volume = 0.9, PitchMin = 0.9, PitchMax = 1.1 }, -- a teep lands
 	KickBlocked = { Ids = { 136811265205147 }, Volume = 0.8, PitchMin = 0.95, PitchMax = 1.05, Fallback = "Block" }, -- a teep checked by the guard
+	Draw = { Ids = {}, Volume = 0.8, PitchMin = 0.95, PitchMax = 1.05 }, -- drawing the katana (1)
+	Sheathe = { Ids = {}, Volume = 0.8, PitchMin = 0.95, PitchMax = 1.05 }, -- sheathing it
 	RollOffMaxDistance = 120,
 	SlashCooldown = 0.2, -- per fighter: fast back-and-forth strokes do not stack whooshes
 	HitSoundCooldown = 0.4, -- per attacker: one cut sound for a blade passing through several body parts

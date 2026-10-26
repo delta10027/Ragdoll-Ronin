@@ -19,6 +19,7 @@ local StateMachine = require(ReplicatedStorage.RagdollRonin.Sim.StateMachine)
 local Dismemberment = require(script.Parent.Dismemberment)
 local Feedback = require(script.Parent.Feedback)
 local DebugService = require(script.Parent.DebugService)
+local SheathService = require(script.Parent.SheathService)
 
 local Lifecycle = {}
 
@@ -120,6 +121,9 @@ function Lifecycle.Spawn(player, opts)
 	Registry.Add(f)
 	if player then
 		player.Character = data.Model
+		if Config.Sheath.StartSheathed then
+			SheathService.Set(f, true) -- players start with the katana in its saya (1 draws it)
+		end
 	end
 	f.AnatomyDirty = true
 	DebugService.Log("spawned", name, "mass", data.TotalMass)
