@@ -324,6 +324,7 @@ Config.Lifecycle = {
 
 Config.Camera = {
 	Offset = Vector3.new(2.0, 0.7, 9.5), -- right, up, back (over the shoulder)
+	FrontOffset = Vector3.new(0, 0.7, 9.5), -- front view (V): centred, looking back at the fighter
 	FocusHeight = 0.9,
 	FollowSharpness = 14,
 	MinPitch = -0.75,

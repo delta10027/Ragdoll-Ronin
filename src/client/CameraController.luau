@@ -3,6 +3,8 @@
 	Yaw/pitch are changed by mouse movement ONLY while no sword button is held; while M1/M2 are
 	held the mouse drives the combat cursor instead and the camera (and therefore facing) holds.
 	The camera yaw is sent to the server as the desired facing.
+	V toggles a front view (camera in front of the fighter looking back at it, e.g. to inspect
+	poses); facing and controls are unchanged, only the camera moves round.
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage:WaitForChild("RagdollRonin"):WaitForChild("Config"))
@@ -15,7 +17,27 @@ params.CollisionGroup = "RR_GroundQuery" -- world geometry only (never fighters,
 params.IgnoreWater = true
 
 function CameraController.Init(ctx)
-	ctx.Camera = { Yaw = 0, Pitch = -0.2, Focus = nil }
+	ctx.Camera = { Yaw = 0, Pitch = -0.2, Focus = nil, Front = false }
+	local label = Instance.new("TextLabel")
+	label.Name = "FrontViewLabel"
+	label.AnchorPoint = Vector2.new(0.5, 0)
+	label.Position = UDim2.new(0.5, 0, 0, 12)
+	label.Size = UDim2.fromOffset(220, 26)
+	label.BackgroundColor3 = Color3.new(0, 0, 0)
+	label.BackgroundTransparency = 0.45
+	label.TextColor3 = Color3.new(1, 1, 1)
+	label.Font = Enum.Font.GothamMedium
+	label.TextSize = 14
+	label.Text = "Front view (V to return)"
+	label.Visible = false
+	label.Parent = ctx.Gui
+	ctx.Camera.Label = label
+end
+
+function CameraController.ToggleFront(ctx)
+	local c = ctx.Camera
+	c.Front = not c.Front
+	c.Label.Visible = c.Front
 end
 
 function CameraController.OnNewFighter(ctx, model)
@@ -50,8 +72,9 @@ function CameraController.Update(ctx, dt)
 	else
 		c.Focus = c.Focus:Lerp(target, 1 - math.exp(-CC.FollowSharpness * dt))
 	end
-	local rot = CFrame.Angles(0, c.Yaw, 0) * CFrame.Angles(c.Pitch, 0, 0)
-	local desired = c.Focus + rot:VectorToWorldSpace(CC.Offset)
+	local yaw = c.Front and c.Yaw + math.pi or c.Yaw
+	local rot = CFrame.Angles(0, yaw, 0) * CFrame.Angles(c.Pitch, 0, 0)
+	local desired = c.Focus + rot:VectorToWorldSpace(c.Front and CC.FrontOffset or CC.Offset)
 	local hit = workspace:Raycast(c.Focus, desired - c.Focus, params)
 	if hit then
 		desired = hit.Position + hit.Normal * 0.3
