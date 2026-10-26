@@ -23,6 +23,7 @@ local BalanceController = require(Shared.Sim.BalanceController)
 local Registry = require(script.Parent.Registry)
 local Feedback = require(script.Parent.Feedback)
 local DebugService = require(script.Parent.DebugService)
+local SoundFX = require(script.Parent.SoundFX)
 
 local KickResolver = {}
 local K = Config.Kick
@@ -65,6 +66,7 @@ local function resolve(att, def, dir, at)
 		shove(att, -dir * K.BlockedPushDV)
 		BalanceController.Stagger(att, K.BlockedStaggerTime, -dir, "Teep blocked")
 		Feedback.Send(att, "KickBlocked", {})
+		SoundFX.Play("KickBlocked", at)
 		Feedback.Send(def, "BlockedKick", {})
 		DebugService.Log(att.Name, "teep blocked by", def.Name)
 		return
@@ -79,6 +81,7 @@ local function resolve(att, def, dir, at)
 		end
 	end
 	Feedback.Send(att, "KickLanded", { Target = def.Name })
+	SoundFX.Play("KickLanded", at)
 	Feedback.Send(def, "Kicked", {})
 	DebugService.Log(att.Name, "teep landed on", def.Name, "balance", def.Balance)
 end

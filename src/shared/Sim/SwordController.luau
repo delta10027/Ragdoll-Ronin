@@ -512,6 +512,7 @@ function SwordController.Track(f, dt, inp)
 			elseif speed > C.StrokeStartSpeed and dirNow:Dot(s.Dir) < C.ReversalDot then
 				SwordController.EndStroke(f, "Reversal")
 				s = SwordController.StartStroke(f, dirNow)
+				Runtime.Sound("Slash", cf.Position, f)
 			elseif not inp.M1 and atk.ReleaseTime and now - atk.ReleaseTime > C.FollowThroughTime then
 				SwordController.EndStroke(f, "Released")
 				s = nil
@@ -521,6 +522,7 @@ function SwordController.Track(f, dt, inp)
 		end
 	elseif canStrike and inp.M1 and speed > C.StrokeStartSpeed then
 		s = SwordController.StartStroke(f, rel / speed)
+		Runtime.Sound("Slash", cf.Position, f)
 	end
 
 	if now < atk.RecoilUntil then

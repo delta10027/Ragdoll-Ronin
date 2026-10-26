@@ -14,6 +14,7 @@
 	                   keeps its own times (OwnerSync sends durations, never times).
 	  Impulse(part, j) apply an impulse; the server replaces it so impulses on a body a client
 	                   simulates are sent to that client.
+	  Sound(name, pos, f) play a Config.Sounds effect; no-op unless the server installs SoundFX.
 	  Debug            diagnostics hooks; no-ops unless the server installs DebugService.
 ]]
 local Runtime = {}
@@ -42,6 +43,7 @@ function Runtime.Impulse(part, impulse)
 end
 
 local function noop() end
+Runtime.Sound = noop
 Runtime.Debug = { Log = noop, Transition = noop, Attr = noop }
 
 return Runtime
