@@ -121,9 +121,6 @@ local function setVec(f, inst, prop, v, eps)
 end
 
 ------------------------------------------------------------------ IK
--- Elbow swing candidates (degrees about the shoulder->target line), tried when the preferred
--- elbow would put the arm inside the torso or head. Ordered so the closest clear one wins.
-local POLE_STEPS = { 0, 20, -20, 40, -40, 60, -60, 80, -80, 100, -100, 120, -120, 140, -140, 160, -160, 180 }
 local LIMIT_COST = 0.6 -- cost per radian past a joint limit (comparable to ~0.1 stud of body overlap per 10 degrees)
 local ARM_RADIUS = 0.21 * S
 
@@ -184,15 +181,37 @@ local function limitExcess(rot, flex, handRot)
 	return over
 end
 
--- Two-bone arm IK in upper-torso space. Returns upper-arm rotation (rest frame: limb along -Y,
--- elbow flexion about +X toward -Z), elbow flex angle and (with avoid) how far the chosen pose
--- goes past the joint limits (radians).
--- avoid (optional table, kept per fighter and side): swing the elbow around the shoulder->target
--- line to the closest position where the arm clears the body and stays within the shoulder (and,
--- given the hand's rotation handRot, wrist) limits, preferring the requested pole and the
--- previous choice.
-local function solveArm(side, target, poleDir, l2, avoid, handRot)
-	l2 = l2 or L2
+------------------------------------------------------------------ arm controller
+--[[
+	Both arms are posed from ONE solution per step that the joint drives and the hand drive agree on,
+	so they never fight (fighting is what twisted arms, bent elbows backwards and left the arm stuck
+	in a broken pose after fast swings):
+
+	  * Two-bone IK to the wrist; the elbow is swung about the shoulder->wrist line by a swivel
+	    angle measured from a natural "down and out" pole.
+	  * Each step a coarse search finds the swivel (and, for the sword arm, a roll of the sword
+	    about its blade, relative to what SwordController asked for) that keeps the arm out of the
+	    body and inside the shoulder/wrist limits while staying close to the requested edge. The
+	    arm's actual swivel and roll then only MOVE TOWARD that answer at a capped rate: when the
+	    best answer changes branch, the elbow swings round smoothly instead of snapping (the wrist
+	    stays where it is while the elbow swivels).
+	  * The wrist rotation is whatever turns the forearm into the requested hand orientation,
+	    clamped into the wrist's limits; forward kinematics then gives the grip the arm really
+	    reaches, and THAT is what the hand drive holds (f.SwordHoldCF).
+	Swivel and roll are rollback state (SimState ArmSwivelR / ArmRollR / ArmSwivelL).
+]]
+local ARM = Config.Drives.Arm
+local SHOULDER_CONE = rad(Anatomy.JointByName.RightShoulder.Cone) - LIMIT_MARGIN
+local SWIVELS = {}
+for a = -160, 180, 20 do
+	table.insert(SWIVELS, rad(a))
+end
+local ROLLS = { 0, rad(30), rad(-30), rad(60), rad(-60), rad(90), rad(-90) }
+
+-- Two-bone IK in upper-torso space with the elbow swung by `swivel` from the natural pole.
+-- Returns the upper-arm rotation (rest frame: limb along -Y, elbow flexion about +X toward -Z),
+-- elbow flex, elbow position and the (reach-clamped) wrist point.
+local function armGeometry(side, target, l2, swivel)
 	local shoulder = SHOULDER[side]
 	local toT = target - shoulder
 	local d = math.clamp(toT.Magnitude, 0.25 * (L1 + l2), (L1 + l2) * 0.999)
@@ -200,30 +219,111 @@ local function solveArm(side, target, poleDir, l2, avoid, handRot)
 	local cosA = math.clamp((L1 * L1 + d * d - l2 * l2) / (2 * L1 * d), -1, 1)
 	local cosE = math.clamp((L1 * L1 + l2 * l2 - d * d) / (2 * L1 * l2), -1, 1)
 	local flex = math.pi - math.acos(cosE)
-	local fallbackPole = Util.perpendicular(POLE[side], n, Util.perpendicular(Vector3.new(0, 0, 1), n, Vector3.xAxis))
-	local pole = poleDir and Util.perpendicular(poleDir, n, fallbackPole) or fallbackPole
 	local sinA = math.sqrt(1 - cosA * cosA)
-	if not avoid then
-		return (armFrame(shoulder, n, cosA, sinA, pole, target)), flex
+	local base = Util.perpendicular(POLE[side], n, Util.perpendicular(Vector3.new(0, 0, 1), n, Vector3.xAxis))
+	local pole = CFrame.fromAxisAngle(n, swivel):VectorToWorldSpace(base)
+	local rot, elbow = armFrame(shoulder, n, cosA, sinA, pole, target)
+	return rot, flex, elbow, shoulder + n * d
+end
+
+-- Clamp a joint rotation (rest frame as in swingTwist) into a cone and twist range
+local function clampSwingTwist(r, cone, twist)
+	local b = r:VectorToWorldSpace(LIMB_AXIS)
+	local swing = math.acos(math.clamp(LIMB_AXIS:Dot(b), -1, 1))
+	local axis = LIMB_AXIS:Cross(b)
+	axis = axis.Magnitude < 1e-6 and Vector3.xAxis or axis.Unit
+	local x = (CFrame.fromAxisAngle(axis, swing):Inverse() * r):VectorToWorldSpace(Vector3.xAxis)
+	local t = math.atan2(x.Z, x.X)
+	if swing <= cone and math.abs(t) <= twist then
+		return r
 	end
-	local tgt = shoulder + n * d
-	local bestRot, bestCost, bestStep, bestOver = nil, math.huge, 0, 0
-	local prev = avoid.Step or 0
-	for _, step in ipairs(POLE_STEPS) do
-		local p = step == 0 and pole or CFrame.fromAxisAngle(n, rad(step)):VectorToWorldSpace(pole)
-		local rot, elbow = armFrame(shoulder, n, cosA, sinA, p, target)
-		local pen = armPenetration(shoulder, elbow, tgt)
-		local over = limitExcess(rot, flex, handRot)
-		local cost = pen + over * LIMIT_COST + 0.0003 * math.abs(step) + 0.0001 * math.abs(step - prev)
-		if cost < bestCost then
-			bestRot, bestCost, bestStep, bestOver = rot, cost, step, over
+	return CFrame.fromAxisAngle(axis, math.min(swing, cone)) * CFrame.fromAxisAngle(Vector3.yAxis, -math.clamp(t, -twist, twist))
+end
+
+local function wristExcess(rot, flex, handRot)
+	local cone, twist = swingTwist((rot * CFrame.fromAxisAngle(Vector3.xAxis, flex)):Inverse() * handRot)
+	return math.max(0, cone - WRIST_CONE) + math.max(0, math.abs(twist) - WRIST_TWIST)
+end
+
+local function shoulderExcess(rot)
+	local _, twist = swingTwist(rot)
+	return math.max(0, math.abs(twist) - SHOULDER_TWIST)
+end
+
+-- hand frame and wrist point for the sword grip rolled by `roll` about the blade
+local function handOf(grip, roll)
+	local hand = (roll == 0 and grip or grip * CFrame.Angles(0, roll, 0)) * GRIP_LOCAL_INV
+	return hand, hand:PointToWorldSpace(WRIST_IN_HAND)
+end
+
+local function approachLinear(cur, target, maxStep)
+	return cur + math.clamp(target - cur, -maxStep, maxStep)
+end
+
+-- Sword arm: returns shoulder rotation, elbow flex, wrist rotation and the grip CFrame it reaches
+local function solveSwordArm(st, grip, dt)
+	-- search (arm geometry once per swivel, at the current roll: rolling about the blade moves the
+	-- wrist only slightly; each roll candidate then only changes the wrist limit)
+	local _, wristNow = handOf(grip, st.Roll)
+	local hands = {}
+	for i, roll in ipairs(ROLLS) do
+		hands[i] = (handOf(grip, roll)).Rotation
+	end
+	local bestCost, bestSwivel, bestRoll = math.huge, st.Swivel, st.Roll
+	local function consider(swivel, extraRoll)
+		local rot, flex, elbow, reach = armGeometry("Right", wristNow, L_FOREARM, swivel)
+		local base = armPenetration(SHOULDER.Right, elbow, reach) + shoulderExcess(rot) * LIMIT_COST
+			+ ARM.SwivelCost * math.abs(swivel) + ARM.Hysteresis * math.abs(Util.angleDelta(st.Swivel, swivel))
+		local function try(roll, handRot)
+			local c = base + wristExcess(rot, flex, handRot) * LIMIT_COST + ARM.RollCost * math.abs(roll)
+				+ ARM.Hysteresis * math.abs(roll - st.Roll)
+			if c < bestCost then
+				bestCost, bestSwivel, bestRoll = c, swivel, roll
+			end
 		end
-		if pen == 0 and over == 0 and step == 0 and prev == 0 then
-			break -- common case: the natural elbow is already fine
+		for i, roll in ipairs(ROLLS) do
+			try(roll, hands[i])
+		end
+		try(extraRoll, (handOf(grip, extraRoll)).Rotation)
+	end
+	for _, swivel in ipairs(SWIVELS) do
+		consider(swivel, st.Roll)
+	end
+	consider(st.Swivel, st.Roll)
+	st.Swivel = Util.angleDelta(0, Util.approachAngle(st.Swivel, bestSwivel, ARM.SwivelRate * dt))
+	st.Roll = approachLinear(st.Roll, bestRoll, ARM.RollRate * dt)
+
+	-- final pose from the arm's own swivel and roll; wrist clamped; forward kinematics
+	local hand, wrist = handOf(grip, st.Roll)
+	local rot, flex = armGeometry("Right", wrist, L_FOREARM, st.Swivel)
+	rot = clampSwingTwist(rot, SHOULDER_CONE, SHOULDER_TWIST)
+	local fore = rot * CFrame.fromAxisAngle(Vector3.xAxis, flex)
+	local wristRot = clampSwingTwist(fore:Inverse() * hand.Rotation, WRIST_CONE, WRIST_TWIST)
+	local handRot = fore * wristRot
+	local elbowPos = SHOULDER.Right + rot:VectorToWorldSpace(Vector3.new(0, -L1, 0))
+	local wristPos = elbowPos + fore:VectorToWorldSpace(Vector3.new(0, -L_FOREARM, 0))
+	local reached = (CFrame.new(wristPos) * handRot * CFrame.new(-WRIST_IN_HAND)) * GRIP_LOCAL
+	return rot, flex, wristRot, reached
+end
+
+-- Off arm: shoulder rotation and elbow flex reaching `target` (hand orientation left free)
+local function solveOffArm(st, target, dt)
+	local bestCost, bestSwivel = math.huge, st.SwivelL
+	local function consider(swivel)
+		local rot, flex, elbow, reach = armGeometry("Left", target, L2, swivel)
+		local c = armPenetration(SHOULDER.Left, elbow, reach) + shoulderExcess(rot) * LIMIT_COST
+			+ ARM.SwivelCost * math.abs(swivel) + ARM.Hysteresis * math.abs(Util.angleDelta(st.SwivelL, swivel))
+		if c < bestCost then
+			bestCost, bestSwivel = c, swivel
 		end
 	end
-	avoid.Step = bestStep
-	return bestRot, flex, bestOver
+	for _, swivel in ipairs(SWIVELS) do
+		consider(swivel)
+	end
+	consider(st.SwivelL)
+	st.SwivelL = Util.angleDelta(0, Util.approachAngle(st.SwivelL, bestSwivel, ARM.SwivelRate * dt))
+	local rot, flex = armGeometry("Left", target, L2, st.SwivelL)
+	return clampSwingTwist(rot, SHOULDER_CONE, SHOULDER_TWIST), flex
 end
 
 ------------------------------------------------------------------ poses
@@ -306,9 +406,9 @@ local function fallingPose(pose)
 	end
 end
 
--- off-hand grip point on the hilt (upper-torso space)
+-- off-hand grip point on the hilt (upper-torso space), on the grip the sword arm really reaches
 local function offHandTarget(f)
-	return (f.SwordTargetCF * CFrame.new(0, -0.55 * Config.Sword.HandleLength, 0)).Position
+	return ((f.SwordHoldCF or f.SwordTargetCF) * CFrame.new(0, -0.55 * Config.Sword.HandleLength, 0)).Position
 end
 
 local function twoHanded(f)
@@ -326,72 +426,33 @@ local function updateOffHandGrip(f)
 	f.OffHandFree = reach > (f.OffHandFree and 1.0 or 1.08)
 end
 
--- Sword roll the arm can actually hold. SwordController asks for the ideal edge (facing the cut,
--- pre-aimed while wound up), but rolling the sword about its blade turns the hand, and some rolls
--- put the wrist and shoulder far past their limits - the arm then bends the wrong way, or the
--- physical hand cannot follow at all. Rolls are tried outward from the requested one (keeping last
--- step's offset while it still works, so the choice does not flicker) and the first one the arm
--- holds within its limits wins.
-local ROLL_STEPS = { 0, 20, -20, 40, -40, 60, -60, 80, -80, 100, -100, 120, -120, 140, -140, 160, -160, 180 }
-local ROLL_TOLERANCE = 0.05 -- radians past the joint limits that still count as reachable
-local ROLL_HYSTERESIS = 40 -- degrees: switch from last step's offset only for a roll this much closer
-
--- orientation-aware IK for the sword arm: aim the wrist, and bend the elbow toward where the
--- forearm would naturally be for the hand orientation, so the wrist needs minimal bending
-local function solveSwordArm(target, roll, step)
-	local cf = roll == 0 and target or target * CFrame.Angles(0, rad(roll), 0) -- about the blade axis
-	local handCF = cf * GRIP_LOCAL_INV
-	local wrist = handCF:PointToWorldSpace(WRIST_IN_HAND)
-	local idealElbow = wrist + handCF.UpVector * L_FOREARM
-	local avoid = { Step = step }
-	local rot, flex, over = solveArm("Right", wrist, idealElbow - SHOULDER.Right, L_FOREARM, avoid, handCF.Rotation)
-	return { CF = cf, Rot = rot, Flex = flex, Over = over, Step = avoid.Step, Roll = roll }
-end
-
-local function pickSwordRoll(target, avoid)
-	local step, prev = avoid.Step or 0, avoid.Roll or 0
-	local pick
-	if prev ~= 0 then
-		local c = solveSwordArm(target, prev, step)
-		if c.Over < ROLL_TOLERANCE then
-			pick = c
-		end
+-- Once per step (before the pose): solve both arms and remember the result for armPose
+local function solveArms(f, dt)
+	f.ArmState = f.ArmState or { Swivel = 0, Roll = 0, SwivelL = 0 }
+	local st = f.ArmState
+	local out = {}
+	f.ArmSolution = out
+	f.SwordHoldCF = nil
+	if f.Sword and f.Joints.RightShoulder and not f.Joints.RightShoulder.Severed and f.SwordTargetCF then
+		local rot, flex, wristRot, reached = solveSwordArm(st, f.SwordTargetCF, dt)
+		out.RightShoulder, out.RightElbow, out.RightWrist = rot, flex, wristRot
+		f.SwordHoldCF = reached
 	end
-	local best
-	for _, roll in ipairs(ROLL_STEPS) do
-		if pick and math.abs(roll) > math.abs(prev) - ROLL_HYSTERESIS then
-			break
-		end
-		local c = solveSwordArm(target, roll, step)
-		if not best or c.Over < best.Over - 1e-6 then
-			best = c
-		end
-		if c.Over < ROLL_TOLERANCE then
-			pick = c
-			break
-		end
+	updateOffHandGrip(f)
+	if twoHanded(f) then
+		out.LeftShoulder, out.LeftElbow = solveOffArm(st, offHandTarget(f), dt)
 	end
-	pick = pick or best
-	avoid.Step, avoid.Roll = pick.Step, pick.Roll
-	return pick
 end
 
 local function armPose(f, pose)
-	f.ArmAvoid = f.ArmAvoid or { Right = {}, Left = {} }
-	f.SwordHoldCF = nil
-	updateOffHandGrip(f)
-	if f.Sword and f.Joints.RightShoulder and not f.Joints.RightShoulder.Severed and f.SwordTargetCF then
-		local pick = pickSwordRoll(f.SwordTargetCF, f.ArmAvoid.Right)
-		f.SwordHoldCF = pick.CF -- the hand drive holds the roll the arm can reach (Apply)
-		pose.RightShoulder = pick.Rot
-		pose.RightElbow = pick.Flex
+	local sol = f.ArmSolution or {}
+	if sol.RightShoulder then
+		pose.RightShoulder, pose.RightElbow, pose.RightWrist = sol.RightShoulder, sol.RightElbow, sol.RightWrist
 	elseif not pose.RightShoulder then
 		hangArms(pose, "Right")
 	end
-	if twoHanded(f) then
-		local rot, flex = solveArm("Left", offHandTarget(f), nil, nil, f.ArmAvoid.Left)
-		pose.LeftShoulder = rot
-		pose.LeftElbow = flex
+	if sol.LeftShoulder then
+		pose.LeftShoulder, pose.LeftElbow = sol.LeftShoulder, sol.LeftElbow
 	elseif not pose.LeftShoulder then
 		hangArms(pose, "Left")
 	end
@@ -496,6 +557,7 @@ function MotorController.Apply(f, dt, inp)
 	f.CommandedVelocity = vel
 
 	-- 1. joints
+	solveArms(f, dt)
 	local pose = MotorController.ComputePose(f, dt)
 	for name, j in pairs(f.Joints) do
 		if not j.Severed then
@@ -503,9 +565,6 @@ function MotorController.Apply(f, dt, inp)
 			if cls then
 				local segF = f.SegFactor[Anatomy.PartByName[j.ChildName].Segment] or 0
 				local t = (ARM_CLASS[j.Def.DriveClass] and armTone or bodyTone) * (0.25 + 0.75 * segF)
-				if name == "RightWrist" and f.Sword then
-					t = 0 -- the sword drive owns the sword hand's orientation
-				end
 				if j.Kind == "Ball" and j.Drive then
 					setNum(f, j.Drive, "MaxTorque", cls.Torque * t, cls.Torque * 0.02)
 					setCF(f, j.TargetAtt, "CFrame", j.TargetBase * (pose[name] or CFrame.identity), 0.01, D.TargetAngleEpsilon)
@@ -583,5 +642,4 @@ function MotorController.Apply(f, dt, inp)
 	end
 end
 
-MotorController.SolveArm = solveArm
 return MotorController

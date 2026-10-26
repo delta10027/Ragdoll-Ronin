@@ -77,6 +77,7 @@ function Lifecycle.Spawn(player, opts)
 		Sword = data.Sword,
 		TotalMass = data.TotalMass,
 		DriveCache = setmetatable({}, { __mode = "k" }),
+		ArmState = { Swivel = 0, Roll = 0, SwivelL = 0 },
 		Dead = false,
 		SpawnTime = os.clock(),
 	}
