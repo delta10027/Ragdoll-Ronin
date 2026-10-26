@@ -213,6 +213,26 @@ function SimState.Load(f)
 	return true
 end
 
+-- Owner mode, every step after the first Load: only the server-only inputs (injury capabilities,
+-- segment strengths, mass) can have changed under the owning client, which keeps everything else
+-- in its own Lua record. Much cheaper than a full Load + Store every step.
+local SERVER_FIELDS = {}
+for _, fd in ipairs(FIELDS) do
+	if fd.Server then
+		table.insert(SERVER_FIELDS, fd)
+	end
+end
+function SimState.LoadServer(f)
+	local lt, ut = f.Parts[LT], f.Parts[UT]
+	if not lt or not ut then
+		return false
+	end
+	for _, fd in ipairs(SERVER_FIELDS) do
+		fd.Set(f, (fd.Part == LT and lt or ut):GetAttribute(fd.Name))
+	end
+	return true
+end
+
 -- After a rollback the engine has restored older attribute and property values: forget what this
 -- client thinks it last wrote so the next step writes everything again.
 function SimState.OnRollback(f)

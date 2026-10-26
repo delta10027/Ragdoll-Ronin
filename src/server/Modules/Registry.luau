@@ -8,6 +8,7 @@ Registry.ById = {}
 Registry.ByPlayer = {}
 Registry.PartToFighter = {}
 Registry.NextId = 0
+local cachedList -- (Registry.List)
 
 local debrisFolder
 function Registry.DebrisFolder()
@@ -25,6 +26,7 @@ function Registry.NewId()
 end
 
 function Registry.Add(f)
+	cachedList = nil
 	Registry.ById[f.Id] = f
 	if f.Player then
 		Registry.ByPlayer[f.Player] = f
@@ -39,6 +41,7 @@ function Registry.Add(f)
 end
 
 function Registry.Remove(f)
+	cachedList = nil
 	Registry.ById[f.Id] = nil
 	if f.Player and Registry.ByPlayer[f.Player] == f then
 		Registry.ByPlayer[f.Player] = nil
@@ -58,13 +61,17 @@ function Registry.FromPart(part)
 	return Registry.PartToFighter[part]
 end
 
--- Snapshot array so callers can safely add/remove fighters while iterating
+-- Snapshot array so callers can safely add/remove fighters while iterating: built once per change
+-- of the set (Add/Remove make a new one, never change one a caller may be iterating), not on every
+-- call (the update loops call this several times a frame). Callers must not modify it.
 function Registry.List()
-	local list = {}
-	for _, f in pairs(Registry.ById) do
-		table.insert(list, f)
+	if not cachedList then
+		cachedList = {}
+		for _, f in pairs(Registry.ById) do
+			table.insert(cachedList, f)
+		end
 	end
-	return list
+	return cachedList
 end
 
 return Registry

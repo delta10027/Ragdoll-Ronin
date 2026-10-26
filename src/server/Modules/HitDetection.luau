@@ -44,12 +44,28 @@ local function inside(zone, p)
 	return math.abs(l.X) <= h.X and math.abs(l.Y) <= h.Y and math.abs(l.Z) <= h.Z
 end
 
+-- Broadphase: can anything this blade could hit be near it at all? (a fighter's body and blade
+-- stay within REACH of its pelvis). Saves the raycasts for every swing nobody is in range of.
+local REACH = 8 + Config.Sword.BladeLength
+local function anyoneNear(f, center, radius)
+	for _, other in pairs(Registry.ById) do
+		local pelvis = other ~= f and not other.Removed and other.Parts.LowerTorso
+		if pelvis and (pelvis.Position - center).Magnitude < radius + REACH then
+			return true
+		end
+	end
+	return false
+end
+
 function HitDetection.Sweep(f, sweep)
-	params.FilterDescendantsInstances = { f.Model }
-	local zones = guardVolumes(f)
 	local prevCF, cf, dt = sweep.PrevCF, sweep.CF, sweep.Dt
 	local tip = SAMPLES[#SAMPLES]
 	local travel = (cf:PointToWorldSpace(tip) - prevCF:PointToWorldSpace(tip)).Magnitude
+	if not anyoneNear(f, cf.Position, travel + Config.Sword.BladeLength) then
+		return {}
+	end
+	params.FilterDescendantsInstances = { f.Model }
+	local zones = guardVolumes(f)
 	local n = math.clamp(math.ceil(travel / C.SubstepDistance), 1, C.MaxSubsteps)
 
 	local earliest = {} -- part -> hit

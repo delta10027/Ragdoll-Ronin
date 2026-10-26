@@ -1,6 +1,6 @@
 --[[
 	BloodFX: bounded server-side visuals (replicate to everyone).
-	  * wound marks welded at contact points (capped per fighter, oldest recycled)
+	  * wound marks at contact points (drawn by the clients, see WoundMark)
 	  * one particle emitter per bleeding source, rate driven by the bleeding model
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -9,37 +9,19 @@ local Config = require(ReplicatedStorage.RagdollRonin.Config)
 local BloodFX = {}
 local BLOOD = Color3.fromRGB(110, 8, 12)
 
+-- Wound marks are drawn by every client (client WoundMarks), welded where the blade went in: a
+-- part the server welded to a body would join that body's assembly, which resets its network
+-- ownership (a hitch for the player who was hit, on every hit) and rebuilds their fighter record.
+local woundRemote = ReplicatedStorage.RagdollRonin.Remotes.WoundEvent
 function BloodFX.WoundMark(f, part, position, normal, severity)
 	if not part or not part.Parent then
 		return
 	end
-	f.WoundMarks = f.WoundMarks or {}
-	if #f.WoundMarks >= Config.Anatomy.MaxWoundMarks then
-		local old = table.remove(f.WoundMarks, 1)
-		if old then
-			old:Destroy()
-		end
-	end
 	local sev = math.clamp(severity, 0, 1)
-	local m = Instance.new("Part")
-	m.Name = "Wound"
-	m.Size = Vector3.new(0.08 + 0.12 * sev, 0.25 + 0.35 * sev, 0.03)
+	local size = Vector3.new(0.08 + 0.12 * sev, 0.25 + 0.35 * sev, 0.03)
 	local n = (normal and normal.Magnitude > 0.5) and normal.Unit or Vector3.yAxis
-	m.CFrame = CFrame.lookAt(position, position + n) * CFrame.Angles(0, 0, math.random() * math.pi)
-	m.Color = BLOOD
-	m.Material = Enum.Material.SmoothPlastic
-	m.Massless = true
-	m.CanCollide, m.CanQuery, m.CanTouch, m.CastShadow = false, false, false, false
-	m.CollisionGroup = "RR_Debris"
-	local w = Instance.new("WeldConstraint")
-	w.Part0 = part
-	w.Part1 = m
-	w.Parent = m
-	m.Parent = part
-	table.insert(f.WoundMarks, m)
-	-- a new welded part makes the engine reset the assembly to automatic network ownership on the
-	-- next step; Main re-claims server ownership over the following frames
-	f.OwnershipDirty = 3
+	local cf = CFrame.lookAt(position, position + n) * CFrame.Angles(0, 0, math.random() * math.pi)
+	woundRemote:FireAllClients(part, part.CFrame:ToObjectSpace(cf), size)
 end
 
 local function newEmitter(parent)

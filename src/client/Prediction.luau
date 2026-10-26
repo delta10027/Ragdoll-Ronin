@@ -53,6 +53,12 @@ local function rebuild(ctx)
 		state.Fighter = nil
 		return
 	end
+	local old = state.Fighter
+	if state.Owner and old and old.Loaded and old.Model == model then
+		-- Owner mode keeps the simulation in the Lua record (ownerStep): hand it to the new record
+		-- through the attributes
+		SimState.Store(old)
+	end
 	local f = SimState.BuildClient(model, ctx.Player)
 	if f then
 		state.Fighter = f
@@ -129,8 +135,18 @@ end
 
 local function ownerStep(ctx, dt)
 	local f = state.Fighter
-	if not f or not SimState.Load(f) then
+	if not f then
 		return
+	end
+	if not f.Loaded then
+		-- the whole state once (the server's at spawn, or the previous record's after a rebuild);
+		-- afterwards this client owns it and only the server's injury inputs are re-read
+		if not SimState.Load(f) then
+			return
+		end
+		f.Loaded = true
+	else
+		SimState.LoadServer(f)
 	end
 	if state.InitModel ~= state.Model then
 		-- first step on this body: the server's starting times are on the server's clock
@@ -150,7 +166,6 @@ local function ownerStep(ctx, dt)
 	BalanceController.Update(f, dt, inp)
 	SwordController.UpdateAim(f, dt, inp)
 	MotorController.Apply(f, dt, inp)
-	SimState.Store(f)
 end
 
 local function setPrediction(model, mode)
@@ -268,8 +283,12 @@ function Prediction.OnNewFighter(ctx, model)
 	if not state.Owner then
 		setPrediction(model, Enum.PredictionMode.On)
 	end
-	local function dirty()
-		state.Dirty = true
+	-- only structural changes need a new record (a joint or part gone, a stump cap); blood
+	-- particles, sounds and wound marks come and go all the time
+	local function dirty(inst)
+		if inst:IsA("BasePart") or inst:IsA("Constraint") or inst:IsA("JointInstance") or inst:IsA("Model") then
+			state.Dirty = true
+		end
 	end
 	table.insert(state.Connections, model.DescendantAdded:Connect(dirty))
 	table.insert(state.Connections, model.DescendantRemoving:Connect(dirty))
