@@ -272,7 +272,10 @@ function SwordController.UpdateAim(f, dt, inp)
 	local spd = math.sqrt(aim.VU * aim.VU + aim.VV * aim.VV)
 	local wantEdge
 	if mode == "Attack" then
-		wantEdge = spd > A.EdgeMinSpeed and cutDirection(aim.U, aim.V, aim.VU, aim.VV, aim.Edge) or aim.Edge
+		-- at rest (no windup) the edge settles to a fixed comfortable roll instead of keeping whatever
+		-- it had: a leftover edge facing down makes the arm IK lift the elbow over the hand
+		local rest = Util.perpendicular(A.RestEdge, dir, aim.Edge)
+		wantEdge = spd > A.EdgeMinSpeed and cutDirection(aim.U, aim.V, aim.VU, aim.VV, aim.Edge) or rest
 		if windup > 0 then
 			-- while drawn back the edge already faces the coming cut (back through the centre of
 			-- the disk; the spine leads the backswing), so the cut starts edge-first. Rolled about

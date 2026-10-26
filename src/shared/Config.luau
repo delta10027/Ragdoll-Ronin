@@ -149,6 +149,9 @@ Config.Aim = {
 	AttackPosLead = 1.3, -- > 1: hands reach the rim position before the blade finishes turning, so
 	-- drawing the cursor in from a windup first swings the blade over, then brings the hands through
 	RimPrepStart = 0.6, -- cursor radius where the windup edge pre-aim starts
+	-- edge roll the attack pose settles to while the cursor rests away from a windup (finishes, centre):
+	-- forward and a little up, so the sword hand's forearm comes from below and the elbow stays low
+	RestEdge = Vector3.new(-0.3, 0.3, -1).Unit,
 	HipTwist = 0.4, -- the hips turn this fraction of the body twist, on top of the waist
 	AttackCenter = { Grip = Vector3.new(0, 0.15, -1.55), Blade = Vector3.new(0, 0.12, -1) },
 	AttackKeys = {
