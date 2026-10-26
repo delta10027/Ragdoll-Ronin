@@ -162,7 +162,9 @@ function BalanceController.Update(f, dt, inp)
 
 	if StateDefs.Upright[st] then
 		-- physical loss of balance
-		if f.UpDot < math.cos(B.TiltFallAngle) then
+		-- (a bow tips the pelvis forward on purpose: that much more tilt is allowed)
+		local bowTip = math.rad(Config.Bow.Angle * Config.Bow.HipShare) * Bow.Amount(f)
+		if f.UpDot < math.cos(B.TiltFallAngle + bowTip) then
 			f.TiltTimer += dt
 		else
 			f.TiltTimer = 0
