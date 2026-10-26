@@ -80,9 +80,28 @@ Config.Movement = {
 	MaxSupportAccel = 2.6, -- * gravity
 	GroundProbeExtra = 1.6,
 	GroundedTolerance = 0.9,
-	StrideLength = 3.0 * S,
-	GaitHipAmplitude = math.rad(30),
-	GaitKneeAmplitude = math.rad(50),
+	-- walk cycle (MotorController.standLegs). Each leg has a stance phase, foot planted and sliding
+	-- back under the hip exactly as fast as the body moves, and a swing phase lifting it forward;
+	-- the leg angles are solved (thigh + shin IK) to reach that foot point, so the feet never skate.
+	-- Stride (one full cycle, two steps) grows slower than speed (speed ^ StrideExponent), as in
+	-- human gait, so both step length and cadence rise: a slow walk takes short, slow steps (about
+	-- 1.8 steps/s), full speed is a run (about 3.2 steps/s).
+	StrideMax = 10 * S, -- at WalkSpeed
+	StrideExponent = 0.7,
+	DutyWalk = 0.62, -- part of the cycle each foot is on the ground, slow (double support)...
+	DutyRun = 0.44, -- ...at most, at full speed; less where the leg cannot reach (a run's flight phase)
+	GaitKneeDip = math.rad(24), -- extra knee bend at mid stance at full stride (the body rides lower)
+	GaitReach = 1.04, -- how far a planted leg reaches (x leg length; the foot rolls heel to toe)
+	SwingLift = 0.35 * S, -- foot clearance in mid swing, slow...
+	SwingLiftRun = 0.8 * S, -- ...and at full speed (the heel comes up behind)
+	GaitBlendRate = 6, -- 1/s: how fast the stride follows a change of speed (starting, stopping)
+	GaitBob = 0.07 * S, -- walking: pelvis rises over the standing leg, dips as the weight changes feet
+	GaitPelvisYaw = math.rad(7), -- the pelvis turns with the stepping leg...
+	GaitShoulderYaw = math.rad(6), -- ...and the shoulders the other way (arms free only)
+	GaitLean = math.rad(6), -- extra forward lean at full speed
+	ArmSwing = math.rad(32), -- free arms swing opposite to the legs (shoulder pitch at full stride)
+	ArmSwingElbow = math.rad(25), -- extra elbow bend as an arm swings forward
+	ArmRunElbow = math.rad(45), -- elbows bend toward a jog's carry at full speed
 	StanceKneeBend = math.rad(16), -- least knee bend; more when the pelvis is lower (crouch, pushed down)
 	CrouchHeightFactor = 0.78, -- CTRL: stance height while crouching
 	CrouchSpeedMult = 0.5,

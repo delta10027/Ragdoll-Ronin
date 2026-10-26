@@ -40,7 +40,7 @@ function BalanceController.Init(f, yaw)
 	f.FacingYaw = yaw or 0
 	f.TiltTimer = 0
 	f.AirTimer = 0
-	f.Gait = { Phase = 0 }
+	f.Gait = { Phase = 0, Stride = 0 }
 	f.Recovery = { Attempts = 0 }
 	f.RecoverRequested = false
 	f.TargetHeight = M.StandHeight
