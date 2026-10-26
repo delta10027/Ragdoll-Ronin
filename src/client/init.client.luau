@@ -23,6 +23,11 @@ local DebugOverlay = require(script.DebugOverlay)
 local Prediction = require(script.Prediction)
 local SoundPlayer = require(script.SoundPlayer)
 local WoundMarks = require(script.WoundMarks)
+local LockOn = require(script.LockOn)
+local ArmorView = require(script.ArmorView)
+local LoadoutMenu = require(script.LoadoutMenu)
+local UserInputService = game:GetService("UserInputService")
+local GuiService = game:GetService("GuiService")
 
 -- default Roblox movement controls are irrelevant for the custom fighter
 task.spawn(function()
@@ -76,6 +81,7 @@ local function onCharacter(model)
 		CameraController.OnNewFighter(ctx, model)
 		CombatCursorUI.OnNewFighter(ctx, model)
 		AnatomyUI.OnNewFighter(ctx, model)
+		LoadoutMenu.OnNewFighter(ctx, model)
 	end
 end
 player:GetPropertyChangedSignal("Character"):Connect(function()
@@ -90,12 +96,30 @@ AnatomyUI.Init(ctx)
 DebugOverlay.Init(ctx)
 SoundPlayer.Init(ctx)
 WoundMarks.Init(ctx)
+LockOn.Init(ctx)
+ArmorView.Init(ctx)
+LoadoutMenu.Init(ctx)
 onCharacter(player.Character)
 
 RunService:BindToRenderStep("RR_Input", Enum.RenderPriority.Input.Value + 1, function(dt)
 	InputController.Update(ctx, dt)
 end)
+-- M opens the loadout menu, H hides the combat disk, K locks on
+UserInputService.InputBegan:Connect(function(io, processed)
+	if processed or GuiService.MenuIsOpen then
+		return
+	end
+	if io.KeyCode == Enum.KeyCode.M then
+		LoadoutMenu.Toggle(ctx)
+	elseif io.KeyCode == Enum.KeyCode.H then
+		CombatCursorUI.ToggleDisk()
+	elseif io.KeyCode == Enum.KeyCode.K then
+		LockOn.Toggle(ctx)
+	end
+end)
+
 RunService:BindToRenderStep("RR_Camera", Enum.RenderPriority.Camera.Value + 2, function(dt)
+	LockOn.Update(ctx, dt)
 	CameraController.Update(ctx, dt)
 	InputController.ApplyMouseMode(ctx)
 end)

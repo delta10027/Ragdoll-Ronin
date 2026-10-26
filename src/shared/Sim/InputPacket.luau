@@ -3,7 +3,7 @@
 	buffer instead of a list of remote arguments, about a third of the bytes:
 	  u32 seq, f32 moveX, moveZ, yaw, aimU, aimV, u8 buttons                       (25 bytes)
 	  Owner mode adds the client's report of its own simulation:
-	  u8 state (index in StateDefs.States), u8 flags (guard, bound, sheathed),
+	  u8 state (index in StateDefs.States), u8 flags (guard, bound, sheathed, incanting),
 	  f32 balance, aimU, aimV, aimVU, aimVV, u32 ack                                (51 bytes)
 	The server validates every value it reads (NetService), as before.
 ]]
@@ -16,7 +16,7 @@ for i, s in ipairs(StateDefs.States) do
 	STATE_INDEX[s] = i
 end
 
--- r (optional) = { State, Balance, Guard, AimU, AimV, AimVU, AimVV, Bound, Ack, Sheathed }
+-- r (optional) = { State, Balance, Guard, AimU, AimV, AimVU, AimVV, Bound, Ack, Sheathed, Incanting }
 function InputPacket.Encode(seq, mx, mz, yaw, u, v, buttons, r)
 	local b = buffer.create(r and FULL or BASE)
 	buffer.writeu32(b, 0, seq % 4294967296)
@@ -28,7 +28,7 @@ function InputPacket.Encode(seq, mx, mz, yaw, u, v, buttons, r)
 	buffer.writeu8(b, 24, buttons)
 	if r then
 		buffer.writeu8(b, 25, STATE_INDEX[r.State] or 0)
-		buffer.writeu8(b, 26, (r.Guard and 1 or 0) + (r.Bound and 2 or 0) + (r.Sheathed and 4 or 0))
+		buffer.writeu8(b, 26, (r.Guard and 1 or 0) + (r.Bound and 2 or 0) + (r.Sheathed and 4 or 0) + (r.Incanting and 8 or 0))
 		buffer.writef32(b, 27, r.Balance)
 		buffer.writef32(b, 31, r.AimU)
 		buffer.writef32(b, 35, r.AimV)
@@ -61,6 +61,7 @@ function InputPacket.Decode(b)
 			Guard = flags % 2 == 1,
 			Bound = math.floor(flags / 2) % 2 == 1,
 			Sheathed = math.floor(flags / 4) % 2 == 1,
+			Incanting = math.floor(flags / 8) % 2 == 1,
 			Balance = buffer.readf32(b, 27),
 			AimU = buffer.readf32(b, 31),
 			AimV = buffer.readf32(b, 35),

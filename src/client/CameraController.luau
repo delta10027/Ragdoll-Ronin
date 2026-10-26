@@ -3,11 +3,13 @@
 	Yaw/pitch are changed by mouse movement ONLY while no sword button is held; while M1/M2 are
 	held the mouse drives the combat cursor instead and the camera (and therefore facing) holds.
 	The camera yaw is sent to the server as the desired facing.
+	Locked on (K, LockOn) the yaw follows the target instead of the mouse.
 	V toggles a front view (camera in front of the fighter looking back at it, e.g. to inspect
 	poses); facing and controls are unchanged, only the camera moves round.
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage:WaitForChild("RagdollRonin"):WaitForChild("Config"))
+local LockOn = require(script.Parent.LockOn)
 
 local CameraController = {}
 local CC = Config.Camera
@@ -51,6 +53,9 @@ end
 
 function CameraController.Rotate(ctx, dx, dy)
 	local c = ctx.Camera
+	if ctx.Lock and ctx.Lock.Target then
+		dx = 0 -- (locked on: the yaw follows the target)
+	end
 	c.Yaw = (c.Yaw - dx * Config.Aim.CameraSensitivity) % (2 * math.pi)
 	c.Pitch = math.clamp(c.Pitch - dy * Config.Aim.CameraSensitivity, CC.MinPitch, CC.MaxPitch)
 end
@@ -71,6 +76,12 @@ function CameraController.Update(ctx, dt)
 		c.Focus = target
 	else
 		c.Focus = c.Focus:Lerp(target, 1 - math.exp(-CC.FollowSharpness * dt))
+	end
+	local lockYaw, lockPitch = LockOn.Aim(ctx, c.Focus)
+	if lockYaw then
+		local k = 1 - math.exp(-CC.LockTurnSharpness * dt)
+		c.Yaw = (c.Yaw + ((lockYaw - c.Yaw + math.pi) % (2 * math.pi) - math.pi) * k) % (2 * math.pi)
+		c.Pitch = math.clamp(c.Pitch + (lockPitch - c.Pitch) * k * 0.5, CC.MinPitch, CC.MaxPitch)
 	end
 	local yaw = c.Front and c.Yaw + math.pi or c.Yaw
 	local rot = CFrame.Angles(0, yaw, 0) * CFrame.Angles(c.Pitch, 0, 0)

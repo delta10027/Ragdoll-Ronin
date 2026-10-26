@@ -73,29 +73,37 @@ function CombatCursorUI.Init(ctx)
 	root.Parent = ctx.Gui
 	ui.Root = root
 
-	local ring = circle(root, 100, Color3.new(1, 1, 1), 1)
+	-- the disk, cursor and blade markers (H hides them; feedback text stays)
+	local disk = Instance.new("Frame")
+	disk.Name = "Disk"
+	disk.BackgroundTransparency = 1
+	disk.Size = UDim2.fromScale(1, 1)
+	disk.Parent = root
+	ui.Disk = disk
+
+	local ring = circle(disk, 100, Color3.new(1, 1, 1), 1)
 	local stroke = Instance.new("UIStroke")
 	stroke.Thickness = 1.5
 	stroke.Transparency = 0.6
 	stroke.Color = Color3.new(1, 1, 1)
 	stroke.Parent = ring
 	ui.Ring, ui.RingStroke = ring, stroke
-	ui.Center = circle(root, 4, Color3.new(1, 1, 1), 0.4)
-	ui.Blade = line(root, 2, Color3.new(1, 1, 1))
-	ui.Guard = line(root, 4, COLORS.Guard)
+	ui.Center = circle(disk, 4, Color3.new(1, 1, 1), 0.4)
+	ui.Blade = line(disk, 2, Color3.new(1, 1, 1))
+	ui.Guard = line(disk, 4, COLORS.Guard)
 	ui.Trail = {}
 	for i = 1, TRAIL do
-		ui.Trail[i] = circle(root, 4, Color3.new(1, 1, 1), 0.5)
+		ui.Trail[i] = circle(disk, 4, Color3.new(1, 1, 1), 0.5)
 	end
-	ui.Arrow = line(root, 2, Color3.new(1, 1, 1))
+	ui.Arrow = line(disk, 2, Color3.new(1, 1, 1))
 	local head = Instance.new("Frame")
 	head.AnchorPoint = Vector2.new(0.5, 0.5)
 	head.Size = UDim2.fromOffset(8, 8)
 	head.BorderSizePixel = 0
 	head.Rotation = 45
-	head.Parent = root
+	head.Parent = disk
 	ui.ArrowHead = head
-	ui.Cursor = circle(root, 10, Color3.new(1, 1, 1), 0)
+	ui.Cursor = circle(disk, 10, Color3.new(1, 1, 1), 0)
 	local cs = Instance.new("UIStroke")
 	cs.Thickness = 1.5
 	cs.Color = Color3.new(0, 0, 0)
@@ -110,7 +118,7 @@ function CombatCursorUI.Init(ctx)
 	ts.Thickness = 1.5
 	ts.Color = Color3.new(1, 1, 1)
 	ts.Parent = tip
-	tip.Parent = root
+	tip.Parent = disk
 	ui.Tip, ui.TipStroke = tip, ts
 
 	local label = Instance.new("TextLabel")
@@ -144,6 +152,12 @@ function CombatCursorUI.Init(ctx)
 	end)
 end
 
+-- H: show / hide the combat disk
+function CombatCursorUI.ToggleDisk()
+	ui.Disk.Visible = not ui.Disk.Visible
+	return ui.Disk.Visible
+end
+
 function CombatCursorUI.OnNewFighter(ctx, model)
 	ui.Death.Visible = false
 	ui.DeathUntil = nil
@@ -168,6 +182,12 @@ local MESSAGES = {
 	KickBlocked = { "TEEP CHECKED", COLORS.Guard },
 	Kicked = { "KICKED BACK", COLORS.Swing },
 	BlockedKick = { "TEEP BLOCKED", COLORS.Guard },
+	ArmorStopped = { "STOPPED BY ARMOUR", COLORS.Guiding },
+	ArmorHeld = { "ARMOUR HELD", COLORS.Guard },
+	EnemyArmorBroken = { "ARMOUR SHATTERED", COLORS.Swing },
+	ArmorBroken = { "YOUR ARMOUR BROKE", COLORS.Swing },
+	Ignited = { "SET ALIGHT", Color3.fromRGB(255, 140, 40) },
+	Burning = { "BURNING", Color3.fromRGB(255, 110, 30) },
 }
 
 function CombatCursorUI.Flash(ctx, kind, info)
@@ -181,6 +201,11 @@ function CombatCursorUI.Flash(ctx, kind, info)
 	elseif kind == "Killed" then
 		text = "KILLED " .. tostring(info.Target)
 		color = Color3.fromRGB(255, 60, 60)
+	elseif kind == "LoadoutRefused" then
+		text, color = tostring(info.Reason or "Not now"), COLORS.Guiding
+		if ctx.LoadoutRefused then
+			ctx.LoadoutRefused(info.Reason)
+		end
 	elseif kind == "Died" then
 		ui.DeathBase = "YOU DIED - " .. tostring(info.Reason)
 		ui.Death.Text = ui.DeathBase

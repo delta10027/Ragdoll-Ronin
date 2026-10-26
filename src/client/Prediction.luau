@@ -129,6 +129,7 @@ local function ownerInput(ctx, f)
 		i.Yaw = ctx.Camera and ctx.Camera.Yaw or i.Yaw
 		i.AimU, i.AimV = s.AimU, s.AimV
 		i.M1, i.M2, i.Kick, i.Crouch, i.Sheath, i.Bow = s.M1, s.M2, s.Kick, s.Crouch, s.Sheath, s.Bow
+		i.Incant = s.Incant
 	end
 	return i
 end

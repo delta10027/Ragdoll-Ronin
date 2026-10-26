@@ -99,6 +99,7 @@ function OwnerSync.Report(f, r)
 		-- the owner drew or sheathed (its client moved the welds; take the parts where they are)
 		Draw.Attach(f, not r.Sheathed, false)
 	end
+	f.ReportIncanting = r.Incanting == true -- (server Incantations watches the animation)
 	local aim = f.Aim
 	aim.U, aim.V, aim.VU, aim.VV = r.AimU, r.AimV, r.AimVU, r.AimVV
 	if not r.Bound then

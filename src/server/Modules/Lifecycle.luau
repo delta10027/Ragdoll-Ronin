@@ -20,6 +20,7 @@ local Dismemberment = require(script.Parent.Dismemberment)
 local Feedback = require(script.Parent.Feedback)
 local DebugService = require(script.Parent.DebugService)
 local Draw = require(ReplicatedStorage.RagdollRonin.Sim.Draw)
+local Loadout = require(script.Parent.Loadout)
 
 local Lifecycle = {}
 
@@ -120,6 +121,7 @@ function Lifecycle.Spawn(player, opts)
 	CharacterBuilder.ClaimOwnership(data.Model)
 	Registry.Add(f)
 	if player then
+		Loadout.Apply(f) -- armour and incantation chosen in the loadout menu
 		player.Character = data.Model
 		if Config.Sheath.StartSheathed then
 			Draw.Attach(f, false, true) -- players start with the katana in its saya (1 draws it)
