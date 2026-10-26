@@ -104,11 +104,14 @@ end
 -- edge should already face the coming cut) and the body twist.
 local function attackPose(u, v)
 	local r = math.min(1, math.sqrt(u * u + v * v))
-	-- rim pose: the two neighbouring keys, blended by cursor angle
+	-- rim pose: the two neighbouring keys, blended by cursor angle. Eased like the guard keys, so
+	-- most of each 45 degree slice holds close to its key pose (the wind-ups and finishes are
+	-- consistent even when the cursor is a little off) and the in-between poses are only passed
+	-- through quickly
 	local n = #ATTACK_KEYS
 	local a = cursorAngle(u, v) / (2 * math.pi) * n
 	local i = math.floor(a)
-	local t = a - i
+	local t = Util.smoothstep(a - i)
 	local k0, k1 = ATTACK_KEYS[i % n + 1], ATTACK_KEYS[(i + 1) % n + 1]
 	local rimPos = k0.Pos:Lerp(k1.Pos, t)
 	local rimDir = Util.slerpUnit(k0.Dir, k1.Dir, t)
