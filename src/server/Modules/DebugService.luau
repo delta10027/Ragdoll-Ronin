@@ -28,6 +28,23 @@ function DebugService.Log(...)
 	end
 end
 
+-- Combat trace (Config.Debug.PrintHits, printed even without RR_Debug): what became of each blade
+-- contact with a body. Rate limited so a flurry cannot flood the output.
+local hitPrints, hitWindow = 0, 0
+function DebugService.Hit(fmt, ...)
+	if not Config.Debug.PrintHits then
+		return
+	end
+	local now = os.clock()
+	if now - hitWindow > 1 then
+		hitWindow, hitPrints = now, 0
+	end
+	hitPrints += 1
+	if hitPrints <= 12 then
+		print("[RR hit] " .. string.format(fmt, ...))
+	end
+end
+
 function DebugService.Transition(f, from, to, reason)
 	if DebugService.Enabled() and Config.Debug.PrintTransitions then
 		print(string.format("[RR] %s: %s -> %s (%s)", f.Name, from, to, tostring(reason)))

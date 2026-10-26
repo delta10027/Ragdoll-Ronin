@@ -245,7 +245,7 @@ local function resolveBodyHit(att, target, h)
 	end
 	local ok, why = plausible(att, target, h)
 	if not ok then
-		DebugService.Log("rejected hit", att.Name, "->", target.Name, why)
+		DebugService.Hit("%s -> %s %s: rejected (%s)", att.Name, target.Name, segName, tostring(why))
 		return "Continue"
 	end
 	att.Attack.SegmentHitTimes[key] = now
@@ -254,6 +254,7 @@ local function resolveBodyHit(att, target, h)
 	local rel = h.PointVel - h.Part:GetVelocityAtPosition(h.Position)
 	local speed = rel.Magnitude
 	if speed < 1e-3 then
+		DebugService.Hit("%s -> %s %s: no relative speed", att.Name, target.Name, segName)
 		return "Continue"
 	end
 	local dir = rel / speed
@@ -278,11 +279,12 @@ local function resolveBodyHit(att, target, h)
 
 	if power < C.MinDamagingPower then
 		stroke.EnergyMult *= 0.9
-		DebugService.Log(att.Name, "touched", target.Name, segName, "power", power)
+		DebugService.Hit("%s -> %s %s: too weak to damage (power %.2f < %.2f, speed %.0f)", att.Name, target.Name, segName, power, C.MinDamagingPower, speed)
 		Feedback.Send(att, "Contact", { Segment = segName })
 		return "Continue"
 	end
 
+	DebugService.Hit("%s -> %s %s: %s power %.1f quality %.2f", att.Name, target.Name, segName, kind, power, quality)
 	local strike = AnatomyService.ApplyStrike(target, {
 		Segment = segName,
 		Part = h.Part,
@@ -325,6 +327,7 @@ local function resolveBodyHit(att, target, h)
 		killFn(target, fatal, att)
 	end
 
+	DebugService.Hit("  -> %s, damage %.0f%s%s", tostring(strike.Outcome), strike.Damage or 0, severed and (", severed " .. severed) or "", fatal and (", fatal: " .. fatal) or "")
 	local info = { Segment = segName, Label = Anatomy.Segments[segName].Label, Kind = kind, Power = math.floor(power * 10) / 10, Outcome = strike.Outcome, Severed = severed, Fatal = fatal }
 	Feedback.Send(att, "Hit", info)
 	Feedback.Send(target, "Hurt", info)
