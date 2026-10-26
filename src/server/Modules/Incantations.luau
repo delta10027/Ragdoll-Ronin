@@ -169,7 +169,9 @@ local function stepBurns(f, dt)
 			any = true
 			rec.Integrity = math.max(0, rec.Integrity - def.BurnIntegrityPerSecond * dt)
 			rec.Functional = not rec.Severed and rec.Integrity > Config.Anatomy.DisableBelow
-			f.Balance = math.max(0, (f.Balance or 0) - def.BurnBalancePerSecond * dt)
+			-- (burning shakes the fighter but never knocks them over, Config.Balance.BodyHitFloor)
+			local bal = f.Balance or 0
+			f.Balance = math.max(bal - def.BurnBalancePerSecond * dt, math.min(bal, Config.Balance.BodyHitFloor))
 		end
 	end
 	if any then

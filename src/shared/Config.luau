@@ -277,6 +277,7 @@ Config.Combat = {
 	ArmInterruptPower = 1.0,
 	HitDVPerPower = 2.2, -- velocity change applied to the struck segment
 	MaxHitDV = 26,
+	MaxBodyHitDV = 12, -- the same, for hits that cannot knock over (not head or legs): no shove tips the body
 	KnockdownDV = 16,
 	DeflectDV = 28,
 	ParryDeflectDV = 42,
@@ -463,6 +464,10 @@ Config.Balance = {
 		Head = 1.3, Neck = 1.2, UpperTorso = 1.0, LowerTorso = 1.15,
 		Arm = 0.45, Hand = 0.3, Thigh = 1.35, Shin = 1.5, Foot = 1.4,
 	},
+	-- only a major hit to the head or the legs knocks a fighter over (CombatResolver.react): a cut
+	-- anywhere else staggers at most, and cannot take balance below BodyHitFloor
+	KnockdownClasses = { Head = true, Thigh = true, Shin = true, Foot = true },
+	BodyHitFloor = 8,
 	AttackingMult = 1.25,
 	BlockingMult = 0.85,
 	OffBalanceMult = 1.5,
