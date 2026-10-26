@@ -72,6 +72,9 @@ end
 -- All pose functions return the grip position (scaled, upper-torso space) and blade direction.
 local READY_POS = A.ReadyGrip * S
 local READY_DIR = A.ReadyBlade.Unit
+-- while kicking the sword is held up in guard, clear of the rising knee (Config.Kick)
+local KICK_POS = Config.Kick.HandsGrip * S
+local KICK_DIR = Config.Kick.HandsBlade.Unit
 -- blade point whose motion defines "the direction the cut travels" (mid-blade toward the tip)
 local CUT_POINT = Config.Sword.HandleLength * 0.25 + Config.Sword.BladeLength * 0.6
 
@@ -303,8 +306,9 @@ function SwordController.UpdateAim(f, dt, inp)
 	local pos = apos:Lerp(gpos, g)
 	local dir = Util.slerpUnit(adir, gdir, g)
 	local ready = aim.Ready
-	pos = pos:Lerp(READY_POS, ready)
-	dir = Util.slerpUnit(dir, READY_DIR, ready)
+	local kicking = st == "Kicking"
+	pos = pos:Lerp(kicking and KICK_POS or READY_POS, ready)
+	dir = Util.slerpUnit(dir, kicking and KICK_DIR or READY_DIR, ready)
 	-- body twist for MotorController (derived each step from the cursor, so it needs no rollback state)
 	aim.Twist = (atwist + (gtwist - atwist) * g) * (1 - ready)
 

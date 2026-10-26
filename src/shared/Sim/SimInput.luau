@@ -10,6 +10,7 @@
 	  Aim    Direction2D  combat cursor (u, v) on the unit disk
 	  Attack Bool         M1 held
 	  Guard  Bool         M2 held
+	  Kick   Bool         C tapped (held a few frames by the client)
 	Inside the simulation both sides read the states with Read(), which validates them exactly
 	like NetService validates packets (nothing is trusted beyond "intent").
 ]]
@@ -24,6 +25,7 @@ local ACTIONS = {
 	Aim = Enum.InputActionType.Direction2D,
 	Attack = Enum.InputActionType.Bool,
 	Guard = Enum.InputActionType.Bool,
+	Kick = Enum.InputActionType.Bool,
 }
 
 -- server: give a player their input context
@@ -75,14 +77,15 @@ function SimInput.Read(player, into)
 		end
 		into.AimU, into.AimV = aim.X, aim.Y
 	end
-	local m1, m2 = action(player, "Attack"), action(player, "Guard")
+	local m1, m2, kick = action(player, "Attack"), action(player, "Guard"), action(player, "Kick")
 	into.M1 = m1 ~= nil and m1:GetState() == true
 	into.M2 = m2 ~= nil and m2:GetState() == true
+	into.Kick = kick ~= nil and kick:GetState() == true
 	return into
 end
 
 -- client, outside the simulation (render step): publish this frame's intent
-function SimInput.Fire(player, move, yaw, u, v, m1, m2)
+function SimInput.Fire(player, move, yaw, u, v, m1, m2, kick)
 	local ctx = player:FindFirstChild(CONTEXT)
 	if not ctx then
 		return false
@@ -98,6 +101,7 @@ function SimInput.Fire(player, move, yaw, u, v, m1, m2)
 	fire("Aim", Vector2.new(u, v))
 	fire("Attack", m1)
 	fire("Guard", m2)
+	fire("Kick", kick == true)
 	return true
 end
 

@@ -2,9 +2,10 @@
 	NetService: the only entry points from clients.
 
 	CombatInput (UnreliableRemoteEvent, ~60 Hz): seq, moveX, moveZ, yaw, aimU, aimV, buttons
+	  (buttons: bit0 = M1, bit1 = M2, bit2 = kick)
 	  * token-bucket rate limit per player; malformed or non-finite packets are dropped
 	  * out-of-order packets (seq not increasing) are dropped
-	  * move clamped to unit length, aim clamped to the unit disk, buttons masked to 2 bits
+	  * move clamped to unit length, aim clamped to the unit disk, buttons masked to 3 bits
 	  The server converts this INTENT into motion itself (speed caps, inertia, physical drives),
 	  so no packet can move the sword faster than physics allows or declare a hit/damage.
 	  Owner mode adds the client's own simulation of its fighter after the buttons (see OwnerSync):
@@ -121,14 +122,15 @@ local function onInput(player, seq, mx, mz, yaw, u, v, buttons, ...)
 	if r > 1 then
 		u, v = u / r, v / r
 	end
-	buttons = math.floor(buttons) % 4
+	buttons = math.floor(buttons) % 8
 	i.Seq = seq
 	i.Move = move
 	i.Yaw = yaw % (2 * math.pi)
 	i.AimU = u
 	i.AimV = v
 	i.M1 = buttons % 2 == 1
-	i.M2 = buttons >= 2
+	i.M2 = math.floor(buttons / 2) % 2 == 1
+	i.Kick = buttons >= 4
 	i.LastPacket = os.clock()
 	-- (no report yet while the client is still building its fighter record)
 	if OwnerSync.Applies(f) and select("#", ...) > 0 and (...) ~= nil and not ownerReport(f, ...) then

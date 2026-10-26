@@ -6,7 +6,7 @@
 local StateDefs = {}
 
 StateDefs.States = {
-	"Idle", "Moving", "Attacking", "Blocking", "Staggered", "OffBalance",
+	"Idle", "Moving", "Attacking", "Blocking", "Kicking", "Staggered", "OffBalance",
 	"Falling", "GroundedRecovery", "Recovering", "SeverelyInjured", "Dead",
 }
 
@@ -20,10 +20,11 @@ end
 
 -- Allowed transitions. Anything not listed is rejected (and logged in debug mode).
 StateDefs.Transitions = {
-	Idle = set({ "Moving", "Attacking", "Blocking", "Staggered", "OffBalance", "Falling", "SeverelyInjured", "Dead" }),
-	Moving = set({ "Idle", "Attacking", "Blocking", "Staggered", "OffBalance", "Falling", "SeverelyInjured", "Dead" }),
-	Attacking = set({ "Idle", "Moving", "Blocking", "Staggered", "OffBalance", "Falling", "SeverelyInjured", "Dead" }),
-	Blocking = set({ "Idle", "Moving", "Attacking", "Staggered", "OffBalance", "Falling", "SeverelyInjured", "Dead" }),
+	Idle = set({ "Moving", "Attacking", "Blocking", "Kicking", "Staggered", "OffBalance", "Falling", "SeverelyInjured", "Dead" }),
+	Moving = set({ "Idle", "Attacking", "Blocking", "Kicking", "Staggered", "OffBalance", "Falling", "SeverelyInjured", "Dead" }),
+	Attacking = set({ "Idle", "Moving", "Blocking", "Kicking", "Staggered", "OffBalance", "Falling", "SeverelyInjured", "Dead" }),
+	Blocking = set({ "Idle", "Moving", "Attacking", "Kicking", "Staggered", "OffBalance", "Falling", "SeverelyInjured", "Dead" }),
+	Kicking = set({ "Idle", "Moving", "Staggered", "OffBalance", "Falling", "SeverelyInjured", "Dead" }),
 	Staggered = set({ "Idle", "OffBalance", "Falling", "SeverelyInjured", "Dead" }),
 	OffBalance = set({ "Idle", "Staggered", "Falling", "SeverelyInjured", "Dead" }),
 	Falling = set({ "GroundedRecovery", "SeverelyInjured", "Dead" }),
@@ -34,7 +35,7 @@ StateDefs.Transitions = {
 }
 
 -- States in which the body is actively held upright (support force + upright torque)
-StateDefs.Upright = set({ "Idle", "Moving", "Attacking", "Blocking", "Staggered", "OffBalance" })
+StateDefs.Upright = set({ "Idle", "Moving", "Attacking", "Blocking", "Kicking", "Staggered", "OffBalance" })
 -- States in which the fighter is on (or going to) the ground
 StateDefs.Ground = set({ "Falling", "GroundedRecovery", "SeverelyInjured" })
 -- States that accept player combat/move intent directly
