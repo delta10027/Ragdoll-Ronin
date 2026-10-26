@@ -278,7 +278,12 @@ function SwordController.UpdateAim(f, dt, inp)
 			-- the disk; the spine leads the backswing), so the cut starts edge-first. Rolled about
 			-- the blade axis: the two directions are often opposite, and blending opposite
 			-- vectors passes through zero and snaps the blade over.
-			local cut = cutDirection(aim.U, aim.V, -aim.U, -aim.V, wantEdge)
+			-- Measured just inside the rim: out there the pose no longer changes with the radius, so
+			-- the cut direction would be undefined and the edge would keep whatever roll it had
+			-- (e.g. facing down, which swings the elbow up over the shoulder).
+			local rr = math.sqrt(aim.U * aim.U + aim.V * aim.V)
+			local inner = rr > 1e-3 and math.min(1, A.AttackRimFull * 0.9 / rr) or 1
+			local cut = cutDirection(aim.U * inner, aim.V * inner, -aim.U, -aim.V, wantEdge)
 			wantEdge = Util.rollToward(wantEdge, cut, dir, Util.smoothstep(windup * 2))
 		end
 	elseif mode == "Ready" then
