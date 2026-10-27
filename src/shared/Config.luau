@@ -391,10 +391,43 @@ Config.Armor = {
 	Inflate = 0.07 * S, -- shell thickness over each body part
 }
 
+-- Wind (Shared.Sim.Wind): one wind for the whole server, blowing toward a compass yaw at Speed
+-- studs/s. Kept on the workspace (attributes "WindSpeed", "WindYaw") so every client sees it;
+-- anyone can change it from the loadout menu (M). It drives the faint wave streaks drawn around
+-- the camera (client WindView), the Cloak's cape, and, once strong, the fighters themselves:
+-- walking into it is slower, and a fighter with the sword sheathed walking into it raises the
+-- left forearm across the face and leans in.
+Config.Wind = {
+	Speed = 8, -- at server start
+	Yaw = 45, -- degrees: 0 blows toward -Z (the spawn's forward), 90 toward -X
+	MaxSpeed = 60,
+	SpeedStep = 5, -- menu - / +
+	YawStep = 45, -- menu turn left / right
+	HighSpeed = 25, -- from here the fighters feel it...
+	FullSpeed = 50, -- ...fully from here
+	IntoSlow = 0.45, -- walking straight into full wind loses this fraction of the walk speed
+	-- covering the face: the left upper arm comes up forward and in, the forearm folds up across
+	-- the face (degrees; shoulder pitch + forward, roll + toward the body's middle)
+	CoverShoulderPitch = 85,
+	CoverShoulderRoll = 28,
+	CoverElbow = 118,
+	CoverLean = 10, -- degrees of extra forward lean while covering the face
+	CoverHeadDown = 14, -- degrees the head tucks down behind the arm
+	-- streaks (client WindView): each a short wavy trail flying downwind near the camera
+	Wisps = 36, -- at FullSpeed (fewer in lighter wind, none below CalmSpeed)
+	CalmSpeed = 2,
+	WispRadius = 55, -- studs around the camera they appear in
+	WispLife = { 2.0, 3.5 }, -- seconds, random in range
+	WispWave = 0.6, -- studs of up-and-down wave...
+	WispWavelength = 10, -- ...one wave every this many studs downwind
+	WispTransparency = 0.82, -- the trail's most opaque point (1 = invisible)
+	WispTrailLength = 9, -- studs of trail behind each wisp's head
+}
+
 -- The Cloak's cape (client CloakView): a cloth of Cols x Rows points pinned across the back of the
 -- shoulders, simulated locally on every client (verlet, fixed Step) and drawn as panels. It falls
--- under gravity, is pushed by the wind and trails the fighter's motion; the torso, legs and ground
--- keep it out.
+-- under gravity, is pushed by the wind (Config.Wind) and trails the fighter's motion; the torso,
+-- legs and ground keep it out.
 Config.Cloak = {
 	Cols = 4,
 	Rows = 8,
@@ -406,7 +439,6 @@ Config.Cloak = {
 	Iterations = 6, -- constraint passes per step (higher: less stretch)
 	GravityScale = 0.45, -- of workspace.Gravity: cloth falls floatier than a body
 	Drag = 3, -- per second, pulls the cloth toward the wind's velocity
-	Wind = Vector3.new(7, 0, 3), -- studs/s
 	Gust = 0.4, -- the wind swells and falls by this fraction
 	Flutter = 0.5, -- per-point wind variation (ripples along the cape)
 	BodyMargin = 0.1 * S, -- the cape keeps this far off the torso and legs

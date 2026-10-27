@@ -3,7 +3,8 @@
 	  collar  a band around the neck, welded to the Neck
 	  mantle  a layer over the shoulders, welded to the UpperTorso, with a clasp at the front
 	  cape    a cloth of Cols x Rows points; the top row is pinned across the back of the shoulders,
-	          the rest is simulated here (verlet at a fixed Step): gravity, drag toward the wind,
+	          the rest is simulated here (verlet at a fixed Step): gravity, drag toward the wind
+	          (Shared.Sim.Wind, gusting and fluttering along the cloth),
 	          distance constraints between neighbours, pushed out of the torso and leg boxes and
 	          kept above the ground. Each cell is drawn as an anchored panel between its corners.
 	Local parts only, like the armour shells. A cape stops simulating once its parts are gone
@@ -13,6 +14,7 @@ local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("RagdollRonin")
 local Config = require(Shared:WaitForChild("Config"))
+local Wind = require(Shared:WaitForChild("Sim"):WaitForChild("Wind"))
 
 local CloakView = {}
 local CL = Config.Cloak
@@ -95,7 +97,7 @@ local function pushOutOfBox(p, part)
 	return part.CFrame:PointToWorldSpace(loc)
 end
 
-local function step(cape, dt, floorY)
+local function step(cape, dt, floorY, windVel)
 	local pos, prev = cape.Pos, cape.Prev
 	local gravity = Vector3.new(0, -workspace.Gravity * CL.GravityScale, 0)
 	local gust = 1 + CL.Gust * math.sin(clock * 0.8 + cape.Phase)
@@ -104,7 +106,7 @@ local function step(cape, dt, floorY)
 			local p = pos[r][c]
 			local v = (p - prev[r][c]) / dt
 			local flutter = 1 + CL.Flutter * math.sin(clock * 3.1 + r * 0.9 + c * 1.7 + cape.Phase)
-			local wind = CL.Wind * gust * flutter
+			local wind = windVel * gust * flutter
 			local a = gravity + (wind - v) * CL.Drag
 			prev[r][c] = p
 			pos[r][c] = p + v * dt + a * dt * dt
@@ -197,6 +199,7 @@ local function update(dt)
 	local camera = workspace.CurrentCamera
 	local camPos = camera and camera.CFrame.Position or Vector3.zero
 	local parts, cframes = {}, {}
+	local windVel = Wind.Velocity()
 	for i = #capes, 1, -1 do
 		local cape = capes[i]
 		local upper = cape.Upper
@@ -223,7 +226,7 @@ local function update(dt)
 		cape.Acc = math.min(cape.Acc + dt, CL.Step * 4)
 		while cape.Acc >= CL.Step do
 			cape.Acc -= CL.Step
-			step(cape, CL.Step, floorY)
+			step(cape, CL.Step, floorY, windVel)
 		end
 		render(cape, true, parts, cframes)
 	end
