@@ -25,7 +25,11 @@ local SoundPlayer = require(script.SoundPlayer)
 local WoundMarks = require(script.WoundMarks)
 local LockOn = require(script.LockOn)
 local ArmorView = require(script.ArmorView)
-local LoadoutMenu = require(script.LoadoutMenu)
+local InventoryClient = require(script.InventoryClient)
+local DragDrop = require(script.DragDrop)
+local ItemTooltip = require(script.ItemTooltip)
+local MainMenu = require(script.MainMenu)
+local CreativeMenu = require(script.CreativeMenu)
 local ChatBubbles = require(script.ChatBubbles)
 local WindView = require(script.WindView)
 local WindScreenFX = require(script.WindScreenFX)
@@ -72,7 +76,30 @@ local ctx = {
 	Gui = gui,
 	Remotes = Remotes,
 	Fighter = nil,
+	MenuOpen = false,
 }
+-- a menu opened or closed: the mouse is free and the fighter takes no input while any is open
+function ctx.SyncMenus()
+	ctx.MenuOpen = MainMenu.IsOpen() or CreativeMenu.IsOpen()
+end
+-- server refusal (Feedback "LoadoutRefused", via CombatCursorUI)
+function ctx.LoadoutRefused(reason)
+	if CreativeMenu.IsOpen() then
+		CreativeMenu.Refused(reason)
+	else
+		MainMenu.Refused(reason)
+	end
+end
+
+-- TAB is the game's menu, so Roblox's player list (also on TAB) is turned off
+task.spawn(function()
+	for _ = 1, 20 do
+		if pcall(StarterGui.SetCoreGuiEnabled, StarterGui, Enum.CoreGuiType.PlayerList, false) then
+			break
+		end
+		task.wait(0.5)
+	end
+end)
 
 local function isFighter(model)
 	return model ~= nil and model:GetAttribute("RR_Fighter") == true
@@ -85,7 +112,7 @@ local function onCharacter(model)
 		CameraController.OnNewFighter(ctx, model)
 		CombatCursorUI.OnNewFighter(ctx, model)
 		AnatomyUI.OnNewFighter(ctx, model)
-		LoadoutMenu.OnNewFighter(ctx, model)
+		InventoryClient.OnNewFighter(ctx, model)
 	end
 end
 player:GetPropertyChangedSignal("Character"):Connect(function()
@@ -102,7 +129,11 @@ SoundPlayer.Init(ctx)
 WoundMarks.Init(ctx)
 LockOn.Init(ctx)
 ArmorView.Init(ctx)
-LoadoutMenu.Init(ctx)
+InventoryClient.Init(ctx)
+DragDrop.Init(ctx, gui.Parent)
+ItemTooltip.Init(gui.Parent)
+MainMenu.Init(ctx, gui.Parent)
+CreativeMenu.Init(ctx, gui.Parent)
 ChatBubbles.Init(ctx)
 WindView.Init(ctx)
 WindScreenFX.Init(ctx)
@@ -112,13 +143,24 @@ onCharacter(player.Character)
 RunService:BindToRenderStep("RR_Input", Enum.RenderPriority.Input.Value + 1, function(dt)
 	InputController.Update(ctx, dt)
 end)
--- M opens the loadout menu, H hides the combat disk, K locks on
+-- TAB opens the menu (Backspace: back to its diamonds), M the creative menu, H hides the combat
+-- disk, K locks on
 UserInputService.InputBegan:Connect(function(io, processed)
 	if processed or GuiService.MenuIsOpen then
 		return
 	end
-	if io.KeyCode == Enum.KeyCode.M then
-		LoadoutMenu.Toggle(ctx)
+	if io.KeyCode == Enum.KeyCode.Tab then
+		if CreativeMenu.IsOpen() then
+			CreativeMenu.Toggle(ctx)
+		end
+		MainMenu.Toggle(ctx)
+	elseif io.KeyCode == Enum.KeyCode.Backspace and MainMenu.IsOpen() then
+		MainMenu.Back()
+	elseif io.KeyCode == Enum.KeyCode.M then
+		if MainMenu.IsOpen() then
+			MainMenu.Close(ctx)
+		end
+		CreativeMenu.Toggle(ctx)
 	elseif io.KeyCode == Enum.KeyCode.H then
 		CombatCursorUI.ToggleDisk()
 	elseif io.KeyCode == Enum.KeyCode.K then

@@ -392,29 +392,74 @@ Config.Bow = {
 	Blade = Vector3.new(0.1, 0.35, -0.93), -- (the torso is bent far forward: this points down and ahead)
 }
 
--- Armour (loadout menu, M): pieces of lacquered armour over the body. A damaging hit on a covered
--- segment is stopped by the armour (the blade bounces off: only PowerThrough of it reaches the
--- body, as a blunt blow) and costs the piece one of its Hits; at 0 the piece breaks off and the
--- body under it is exposed. Neck, hands and feet are never covered: the gaps to aim for.
--- Equipping only works out of combat (not hit for EquipCooldown seconds) and restores the piece.
+-- Armour and clothing: the pieces a fighter wears, each in one equipment slot of the inventory
+-- (TAB > Character, Config.Inventory). Armour pieces cover body segments: a damaging hit on a
+-- covered segment is stopped (the blade bounces off: only PowerThrough of it reaches the body, as
+-- a blunt blow) and costs the piece one of its Hits; at 0 the piece breaks off and the body under
+-- it is exposed. Neck, torso, arms and hands are never covered: the gaps to aim for.
+-- Equipping armour only works out of combat (not hit for EquipCooldown seconds) and restores it.
 -- Cosmetic pieces cover no segments: they never stop a blow, never break, and go on any time.
+-- View: how the client draws it (ArmorView: "Shell" plates over the segments, "Helmet" a kabuto
+-- over the crown; CloakView: "Cloak", "Cape", "Scarf"; GearView: "Kasa", "Satchel", "Pack",
+-- "Waraji"). The keys are the item keys of Config.Items.
 Config.Armor = {
 	PowerThrough = 0.2,
 	EquipCooldown = 8,
-	Order = { "Helmet", "Chest", "Arms", "Legs", "Cloak" },
+	Order = { "Kabuto", "Kasa", "Cloak", "Cape", "Scarf", "Satchel", "TravelPack", "Suneate", "Kogake", "Waraji" },
 	Pieces = {
-		Helmet = { Label = "Kabuto (helmet)", Hits = 3, Segments = { "Head" }, Color = Color3.fromRGB(30, 28, 30) },
-		Chest = { Label = "Do (chest)", Hits = 5, Segments = { "UpperTorso", "LowerTorso" }, Color = Color3.fromRGB(95, 22, 24) },
-		Arms = { Label = "Kote (sleeves)", Hits = 4, Segments = { "LeftUpperArm", "LeftForearm", "RightUpperArm", "RightForearm" }, Color = Color3.fromRGB(38, 36, 40) },
-		Legs = { Label = "Suneate (greaves)", Hits = 4, Segments = { "LeftThigh", "LeftShin", "RightThigh", "RightShin" }, Color = Color3.fromRGB(38, 36, 40) },
-		Cloak = { Label = "Cloak (cosmetic)", Cosmetic = true, Hits = 1, Segments = {}, Color = Color3.fromRGB(78, 20, 26) },
+		Kabuto = { Label = "Kabuto", Hits = 3, Segments = { "Head" }, Color = Color3.fromRGB(30, 28, 30), View = "Helmet" },
+		Kasa = { Label = "Kasa", Cosmetic = true, Hits = 1, Segments = {}, Color = Color3.fromRGB(196, 164, 104), View = "Kasa" },
+		Cloak = { Label = "Cloak", Cosmetic = true, Hits = 1, Segments = {}, Color = Color3.fromRGB(78, 20, 26), View = "Cloak" },
+		Cape = { Label = "Travelling Cape", Cosmetic = true, Hits = 1, Segments = {}, Color = Color3.fromRGB(36, 40, 52), View = "Cape" },
+		Scarf = { Label = "Scarf", Cosmetic = true, Hits = 1, Segments = {}, Color = Color3.fromRGB(176, 44, 40), View = "Scarf" },
+		Satchel = { Label = "Satchel", Cosmetic = true, Hits = 1, Segments = {}, Color = Color3.fromRGB(112, 76, 48), View = "Satchel" },
+		TravelPack = { Label = "Travel Pack", Cosmetic = true, Hits = 1, Segments = {}, Color = Color3.fromRGB(88, 70, 50), View = "Pack" },
+		Suneate = { Label = "Suneate", Hits = 4, Segments = { "LeftThigh", "LeftShin", "RightThigh", "RightShin" }, Color = Color3.fromRGB(38, 36, 40), View = "Shell" },
+		Kogake = { Label = "Kogake", Hits = 3, Segments = { "LeftFoot", "RightFoot" }, Color = Color3.fromRGB(44, 40, 44), View = "Shell" },
+		Waraji = { Label = "Waraji", Cosmetic = true, Hits = 1, Segments = {}, Color = Color3.fromRGB(200, 170, 110), View = "Waraji" },
 	},
 	Inflate = 0.07 * S, -- shell thickness over each body part
 }
 
+-- The inventory (TAB > Character): a grid of the items a player carries and five equipment slots.
+-- Kept by the server (Loadout) for the session and mirrored to the owner as the Player attribute
+-- "RR_Inventory" (JSON). A bag in the Back slot adds its Capacity to the grid. The incantation
+-- book set on the sword (TAB > Weapon) is the one J casts.
+Config.Inventory = {
+	Capacity = 16, -- grid cells without a bag
+	Slots = { "Head", "Neck", "Back", "Legs", "Boots" },
+	SlotHints = { Head = "Helmets, hats", Neck = "Scarves, cloaks, capes", Back = "Bags", Legs = "Leg armour", Boots = "Boots" },
+	Starter = { "Kabuto", "Cloak", "Suneate", "BookFire" }, -- what a player joins with
+	Creative = true, -- the creative menu (M) may give items (false: nobody can)
+}
+
+-- Every item there is (the creative menu, M, lists them in Order). Kind "Wear" goes in Slot
+-- (its look and armour are Config.Armor.Pieces[key]); "Book" carries an incantation
+-- (Config.Incantations) and is set on the sword. Capacity: extra grid cells a bag gives.
+Config.Items = {
+	Order = { "Kabuto", "Kasa", "Cloak", "Cape", "Scarf", "Satchel", "TravelPack", "Suneate", "Kogake", "Waraji", "BookFire" },
+	Kabuto = { Kind = "Wear", Slot = "Head", Description = "A lacquered war helmet. Turns aside blows to the head." },
+	Kasa = { Kind = "Wear", Slot = "Head", Description = "A wide straw hat against sun and rain." },
+	Cloak = { Kind = "Wear", Slot = "Neck", Description = "A heavy cloak with a mantle over the shoulders. Flows in the wind." },
+	Cape = { Kind = "Wear", Slot = "Neck", Description = "A long, light cape for the road." },
+	Scarf = { Kind = "Wear", Slot = "Neck", Description = "A scarf wound about the neck, its ends trailing behind." },
+	Satchel = { Kind = "Wear", Slot = "Back", Capacity = 6, Description = "A small leather bag on a strap." },
+	TravelPack = { Kind = "Wear", Slot = "Back", Capacity = 12, Description = "A framed pack with a rolled blanket on top." },
+	Suneate = { Kind = "Wear", Slot = "Legs", Description = "Plated guards over the thighs and shins." },
+	Kogake = { Kind = "Wear", Slot = "Boots", Description = "Armoured foot covers." },
+	Waraji = { Kind = "Wear", Slot = "Boots", Description = "Woven straw sandals, tied at the ankle." },
+	BookFire = { Kind = "Book", Label = "Book of Fire", Incantation = "Fire", Color = Color3.fromRGB(176, 52, 28), Description = "Set on the sword, its incantation makes the blade burn." },
+}
+for _, key in ipairs(Config.Items.Order) do
+	local item = Config.Items[key]
+	if item.Kind == "Wear" then
+		item.Label = Config.Armor.Pieces[key].Label
+	end
+end
+
 -- Wind (Shared.Sim.Wind): one wind for the whole server, blowing toward a compass yaw at Speed
 -- studs/s. Kept on the workspace (attributes "WindSpeed", "WindYaw") so every client sees it;
--- anyone can change it from the loadout menu (M). It drives the faint wave streaks drawn around
+-- anyone can change it from the creative menu (M, Weather). It drives the faint wave streaks drawn around
 -- the camera (client WindView), the Cloak's cape, and, once strong, the fighters themselves:
 -- walking into it is slower, and from HighSpeed a fighter with the sword sheathed walking into it
 -- raises the left forearm across the face and leans in (instead of swinging that arm).
@@ -454,7 +499,7 @@ Config.Wind = {
 }
 
 -- Rain (client WeatherView): one rain for the whole server, Intensity 0 (off) .. 1 (downpour), kept
--- on the workspace (attribute "RainIntensity") and changed from the loadout menu (M) like the
+-- on the workspace (attribute "RainIntensity") and changed from the creative menu (M, Weather) like the
 -- wind. Each client draws it around its own camera: streaks that slant with the wind, splashes on
 -- the ground nearby, a slightly darker, greyer grade, and the rain sound below.
 Config.Rain = {
@@ -479,16 +524,13 @@ Config.Rain = {
 	Desaturate = -0.15, -- ColorCorrection saturation at full intensity
 }
 
--- The Cloak's cape (client CloakView): a cloth of Cols x Rows points pinned across the back of the
--- shoulders, simulated locally on every client (verlet, fixed Step) and drawn as panels. It falls
--- under gravity, is pushed by the wind (Config.Wind) and trails the fighter's motion; the torso,
--- legs and ground keep it out.
+-- The cloth of the Cloak, Cape and Scarf (client CloakView): Cols x Rows points pinned across the
+-- back of the shoulders (a Scarf: two narrow tails at the back of the neck), simulated locally on
+-- every client (verlet, fixed Step) and drawn as panels. It falls under gravity, is pushed by the
+-- wind (Config.Wind) and trails the fighter's motion; the torso, legs, a bag and the ground keep
+-- it out. Styles: each piece's shape (Collar, Mantle (0 = none), Clasp, the cloth's size, Strips:
+-- the x offsets of its separate strips).
 Config.Cloak = {
-	Cols = 4,
-	Rows = 8,
-	Length = 3.3 * S, -- shoulders to just above the knees
-	TopWidth = 1.7 * S, -- across the shoulders...
-	BottomWidth = 2.3 * S, -- ...flaring out to the hem
 	Thickness = 0.06 * S,
 	Step = 1 / 60,
 	Iterations = 6, -- constraint passes per step (higher: less stretch)
@@ -499,9 +541,14 @@ Config.Cloak = {
 	BodyMargin = 0.1 * S, -- the cape keeps this far off the torso and legs
 	SimDistance = 150, -- farther from the camera the cape is hidden and not simulated
 	ClaspColor = Color3.fromRGB(196, 158, 70),
+	Styles = {
+		Cloak = { Collar = 0.7, Mantle = 0.18, Clasp = true, Cols = 4, Rows = 8, Length = 3.3 * S, TopWidth = 1.7 * S, BottomWidth = 2.3 * S },
+		Cape = { Collar = 0, Mantle = 0.07, Clasp = true, Cols = 4, Rows = 9, Length = 3.8 * S, TopWidth = 1.8 * S, BottomWidth = 2.0 * S },
+		Scarf = { Collar = 1.0, Mantle = 0, Clasp = false, Cols = 2, Rows = 6, Length = 1.7 * S, TopWidth = 0.3 * S, BottomWidth = 0.26 * S, Strips = { -0.13 * S, 0.16 * S } },
+	},
 }
 
--- Incantations (J, chosen in the loadout menu): the fighter holds the sword level across the
+-- Incantations (J, from the book set on the sword: TAB > Weapon): the fighter holds the sword level across the
 -- chest and runs the free hand along the flat from the guard to the tip (Shared.Sim.Incant);
 -- the blade then takes the incantation for Duration seconds ("Incantation : Fire" in chat).
 Config.Incant = {

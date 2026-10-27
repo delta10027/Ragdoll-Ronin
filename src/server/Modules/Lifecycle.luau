@@ -121,7 +121,7 @@ function Lifecycle.Spawn(player, opts)
 	CharacterBuilder.ClaimOwnership(data.Model)
 	Registry.Add(f)
 	if player then
-		Loadout.Apply(f) -- armour and incantation chosen in the loadout menu
+		Loadout.Apply(f) -- what is equipped in the inventory, and the sword's incantation
 		player.Character = data.Model
 		if Config.Sheath.StartSheathed then
 			Draw.Attach(f, false, true) -- players start with the katana in its saya (1 draws it)

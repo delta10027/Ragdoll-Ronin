@@ -125,7 +125,7 @@ function CombatCursorUI.Init(ctx)
 	label.AnchorPoint = Vector2.new(0.5, 0)
 	label.BackgroundTransparency = 1
 	label.Size = UDim2.fromOffset(240, 26)
-	label.Font = Enum.Font.GothamBold
+	label.FontFace = Font.new("rbxasset://fonts/families/BuilderSans.json", Enum.FontWeight.Bold)
 	label.TextSize = 18
 	label.TextStrokeTransparency = 0.4
 	label.TextColor3 = Color3.new(1, 1, 1)
