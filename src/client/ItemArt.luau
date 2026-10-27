@@ -135,15 +135,15 @@ function ItemArt.Katana()
 end
 
 -- a closed book lying on its back, cover toward +Z
-local function book(parent, color)
+local function book(parent, color, gem)
 	local w, h, t = 1.0, 1.35, 0.3
 	mk(parent, "Cover", Vector3.new(w, h, t), CFrame.new(), color, Enum.Material.Leather)
 	mk(parent, "Pages", Vector3.new(w * 0.94, h * 0.94, t * 0.72), CFrame.new(w * 0.05, 0, 0), Color3.fromRGB(230, 218, 190), Enum.Material.SmoothPlastic)
 	mk(parent, "Spine", Vector3.new(w * 0.1, h * 1.01, t * 1.06), CFrame.new(-w * 0.47, 0, 0), color:Lerp(Color3.new(0, 0, 0), 0.35), Enum.Material.Leather)
-	-- an emblem on the cover: a flame-coloured diamond in a gold ring
+	-- an emblem on the cover: a glowing diamond (the book's Gem colour) in a gold ring
 	local gold = Config.Cloak.ClaspColor
 	mk(parent, "Ring", Vector3.new(0.05, w * 0.5, w * 0.5), CFrame.new(w * 0.04, h * 0.05, t / 2 + 0.01) * CFrame.Angles(0, math.pi / 2, 0), gold, Enum.Material.Metal).Shape = Enum.PartType.Cylinder
-	mk(parent, "Gem", Vector3.new(w * 0.24, w * 0.24, 0.06), CFrame.new(w * 0.04, h * 0.05, t / 2 + 0.04) * CFrame.Angles(0, 0, math.rad(45)), Color3.fromRGB(255, 150, 60), Enum.Material.Neon)
+	mk(parent, "Gem", Vector3.new(w * 0.24, w * 0.24, 0.06), CFrame.new(w * 0.04, h * 0.05, t / 2 + 0.04) * CFrame.Angles(0, 0, math.rad(45)), gem or Color3.fromRGB(255, 150, 60), Enum.Material.Neon)
 	for _, y in ipairs({ -0.38, 0.42 }) do
 		mk(parent, "Band", Vector3.new(w * 1.01, 0.05, t * 1.04), CFrame.new(0, h * y, 0), gold, Enum.Material.Metal)
 	end
@@ -154,7 +154,7 @@ local function buildIcon(key)
 	local vf, world = ItemArt.Viewport({ Size = UDim2.fromScale(1, 1) })
 	if def.Kind == "Book" then
 		local m = Instance.new("Model")
-		book(m, def.Color or Color3.fromRGB(120, 40, 30))
+		book(m, def.Color or Color3.fromRGB(120, 40, 30), def.Gem)
 		m:PivotTo(CFrame.Angles(math.rad(-20), math.rad(25), math.rad(-12)))
 		m.Parent = world
 		ItemArt.Frame(vf, m:GetChildren(), 180, 0, 1.0) -- from +Z: the cover

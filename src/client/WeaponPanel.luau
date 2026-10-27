@@ -283,7 +283,7 @@ function WeaponPanel:Refresh(data)
 			d:Destroy()
 		end
 		s.Empty.Visible = key == nil
-		local color = key and (IT[key].Color or C.Book)
+		local color = key and (IT[key].Glow or IT[key].Color or C.Book)
 		if key then
 			ItemArt.Icon(key).Parent = s.Icon
 			self.Glow.Color = color
@@ -305,9 +305,9 @@ function WeaponPanel:Refresh(data)
 	end
 	local def = key and IT[key]
 	local inc = def and IC[def.Incantation]
-	self.Info.Text = inc and string.format("%s  ·  J with the sword drawn  ·  burns %d s, every %d s", def.Label, inc.Duration, inc.Cooldown)
+	self.Info.Text = inc and string.format("%s  ·  J with the sword drawn  ·  lasts %d s, every %d s", def.Label, inc.Duration, inc.Cooldown)
 		or "Drag an incantation book here"
-	self.Info.TextColor3 = inc and (def.Color or C.Book):Lerp(C.Text, 0.4) or C.Faint
+	self.Info.TextColor3 = inc and (def.Gem or def.Color or C.Book):Lerp(C.Text, 0.4) or C.Faint
 end
 
 function WeaponPanel:Opened()

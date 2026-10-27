@@ -350,7 +350,7 @@ local function resolveBodyHit(att, target, h)
 	if strike.Outcome ~= "Stopped" then
 		BloodFX.Source(target, segName, h.Part, CFrame.new(h.Position))
 		BloodFX.Burst(h.Part, h.Position, strike.Damage * 0.5)
-		Incantations.OnWound(att, target, segName, h.Part) -- a burning blade sets the wound alight
+		Incantations.OnWound(att, target, segName, h.Part) -- a burning blade sets the wound alight, a shadowed one shrouds it
 	end
 
 	local severed = nil
