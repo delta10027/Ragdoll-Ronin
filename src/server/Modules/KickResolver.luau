@@ -10,7 +10,7 @@
 	           loses balance; with no balance left it is knocked down. A teep is a push: no damage.
 	The pelvis' replicated facing is used (not FacingYaw), so this also works for a fighter its
 	owner simulates (Owner mode); impulses and reactions reach the owner through Runtime.Impulse
-	and OwnerSync.
+	and OwnerSync. With Lightning on the blade, each kick also shoots a bolt (Incantations.OnKick).
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage.RagdollRonin
@@ -24,6 +24,7 @@ local Registry = require(script.Parent.Registry)
 local Feedback = require(script.Parent.Feedback)
 local DebugService = require(script.Parent.DebugService)
 local SoundFX = require(script.Parent.SoundFX)
+local Incantations = require(script.Parent.Incantations)
 
 local KickResolver = {}
 local K = Config.Kick
@@ -98,6 +99,7 @@ function KickResolver.Step(f)
 	if f.KickStamp ~= f.StateTime then -- a new kick
 		f.KickStamp = f.StateTime
 		f.KickLanded = false
+		f.KickBolted = false
 	end
 	if f.KickLanded then
 		return
@@ -105,6 +107,10 @@ function KickResolver.Step(f)
 	local dir = facingOf(f)
 	if (foot.Position - pelvis.Position):Dot(dir) < K.ActiveReach then
 		return
+	end
+	if not f.KickBolted then
+		f.KickBolted = true
+		Incantations.OnKick(f, foot.Position, dir) -- a Lightning blade: the kick shoots a bolt
 	end
 	params.FilterDescendantsInstances = { f.Model }
 	for _, part in ipairs(workspace:GetPartBoundsInRadius(foot.Position, K.FootRadius, params)) do

@@ -189,6 +189,8 @@ local MESSAGES = {
 	Ignited = { "SET ALIGHT", Color3.fromRGB(255, 140, 40) },
 	Burning = { "BURNING", Color3.fromRGB(255, 110, 30) },
 	ShroudedEnemy = { "SHROUDED", Color3.fromRGB(170, 120, 240) },
+	ShockedEnemy = { "THUNDERSTRUCK", Color3.fromRGB(150, 200, 255) },
+	Shocked = { "SHOCKED", Color3.fromRGB(150, 200, 255) },
 }
 
 function CombatCursorUI.Flash(ctx, kind, info)
