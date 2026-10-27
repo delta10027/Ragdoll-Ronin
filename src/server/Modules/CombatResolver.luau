@@ -200,21 +200,30 @@ local function react(att, target, h, dir, power, segName, strike)
 	local injuryMult = 1 + (1 - target.Caps.LegSupport) * 0.8
 	local push = Util.unit(Util.flat(dir), Vector3.zAxis)
 
+	-- only the head and the legs can be hit hard enough to fell a fighter (Config.Balance)
+	local canFell = BL.KnockdownClasses[segDef.BalanceClass] == true
+
 	-- bounded physical impulse on the struck segment
 	if h.Part.Parent and Registry.FromPart(h.Part) == target then
-		local dv = math.min(power * C.HitDVPerPower, C.MaxHitDV)
+		local dv = math.min(power * C.HitDVPerPower, canFell and C.MaxHitDV or C.MaxBodyHitDV)
 		Runtime.Impulse(h.Part, dir * dv * h.Part.AssemblyMass)
 	end
 
-	target.Balance -= power * BL.CostPerPower * locMult * stateMult * injuryMult
+	local cost = power * BL.CostPerPower * locMult * stateMult * injuryMult
+	if canFell then
+		target.Balance -= cost
+	else
+		-- (never empties the balance, which would knock the fighter over)
+		target.Balance = math.max(target.Balance - cost, math.min(target.Balance, BL.BodyHitFloor))
+	end
 	local effective = power * locMult * injuryMult
 	local reaction = "Flinch"
 	if StateDefs.Ground[st] or st == "Recovering" then
-		if st == "Recovering" and effective >= C.StaggerPower then
+		if st == "Recovering" and canFell and effective >= C.StaggerPower then
 			StateMachine.Set(target, "Falling", "Hit while getting up")
 			reaction = "Knocked back down"
 		end
-	elseif effective >= C.KnockdownPower or target.Balance <= 0 then
+	elseif canFell and (effective >= C.KnockdownPower or target.Balance <= 0) then
 		BalanceController.KnockDown(target, push, power, "Knocked down")
 		reaction = "Knockdown"
 		Feedback.Send(target, "KnockedDown", {})
