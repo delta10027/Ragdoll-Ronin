@@ -21,6 +21,7 @@ local Spacing = require(script.Parent.Spacing)
 local Kick = require(script.Parent.Kick)
 local Bow = require(script.Parent.Bow)
 local StateMachine = require(script.Parent.StateMachine)
+local Wind = require(script.Parent.Wind)
 
 local MotorController = {}
 
@@ -611,6 +612,10 @@ local function uprightPose(f, dt)
 	local pose = {}
 	local st = f.State
 	local aim = f.Aim
+	-- strong wind, sword sheathed: walking into it the fighter shields the face (Sim.Wind)
+	local W = Config.Wind
+	local armFree = not f.Sword or (f.Sheathed and not f.DrawPose)
+	local cover = armFree and Wind.Cover(f.CommandedVelocity, Vector3.new(-math.sin(f.FacingYaw), 0, -math.cos(f.FacingYaw))) or 0
 	-- body twist from the sword pose (wind-up / follow-through, guard side): the waist turns by it
 	-- and the hips add Config.Aim.HipTwist of it (pelvis facing, see Apply); the neck turns the head
 	-- back to the front
@@ -626,9 +631,10 @@ local function uprightPose(f, dt)
 		local ahead = cv:Dot(Vector3.new(-math.sin(f.FacingYaw), 0, -math.cos(f.FacingYaw)))
 		lean += M.GaitLean * math.clamp(ahead / M.WalkSpeed, 0, 1)
 	end
+	lean += rad(W.CoverLean) * cover -- leaning into the wind
 	pose.Waist = CFrame.Angles(0, torsoYaw, 0) * CFrame.Angles(-lean, 0, 0)
 	pose.NeckBase = CFrame.Angles(0, -twist * 0.5, 0)
-	pose.NeckHead = CFrame.Angles(lean * 0.5, -twist * 0.5, 0)
+	pose.NeckHead = CFrame.Angles(lean * 0.5 - rad(W.CoverHeadDown) * cover, -twist * 0.5, 0)
 	if f.Caps.Kneeling then
 		kneelLegs(f, pose)
 	else
@@ -669,6 +675,13 @@ local function uprightPose(f, dt)
 		for _, side in ipairs({ "Left", "Right" }) do
 			pose[side .. "Hip"] = CFrame.Angles(hip, 0, 0) * pose[side .. "Hip"]
 		end
+	end
+	if cover > 0 then
+		-- the left forearm comes up across the face, blended from the walking arm swing
+		hangArms(pose, "Left", f)
+		local shield = CFrame.Angles(rad(W.CoverShoulderPitch), 0, rad(W.CoverShoulderRoll))
+		pose.LeftShoulder = pose.LeftShoulder:Lerp(shield, cover)
+		pose.LeftElbow += (rad(W.CoverElbow) - pose.LeftElbow) * cover
 	end
 	armPose(f, pose)
 	return pose
@@ -723,7 +736,7 @@ function MotorController.Apply(f, dt, inp)
 	local moveDir = StateDefs.Upright[st] and inp.Move or Vector3.zero
 	local speed = M.WalkSpeed * tone.Move * caps.Move * (caps.Kneeling and M.KneelSpeedMult or 1)
 		* (inp.Crouch and M.CrouchSpeedMult or 1)
-	local vel = moveDir * speed
+	local vel = Wind.Resist(moveDir * speed) -- slower walking into a strong wind
 	if StateDefs.Upright[st] then
 		vel = Spacing.Adjust(f, vel)
 	end

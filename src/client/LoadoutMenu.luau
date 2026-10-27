@@ -3,6 +3,7 @@
 	  Armour       put each piece on or take it off (server Loadout / Armor). Shows the hits a worn
 	               piece has left, or that it is broken. Armour only goes on out of combat.
 	  Incantation  the one J casts (None, Fire)
+	  Wind         the server's wind (Config.Wind): speed - / +, and turn its direction left / right
 	While the menu is open the mouse is free and the fighter takes no input (ctx.MenuOpen).
 	Also sends "Incantation : <name>" to the chat when one of yours takes hold (the model's
 	"IncantActive" attribute, set by the server when the rub is complete).
@@ -15,6 +16,8 @@ local Config = require(ReplicatedStorage:WaitForChild("RagdollRonin"):WaitForChi
 local LoadoutMenu = {}
 local AR = Config.Armor
 local IC = Config.Incantations
+local W = Config.Wind
+local COMPASS = { "N", "NW", "W", "SW", "S", "SE", "E", "NE" } -- yaw 0 blows toward -Z (N), 90 toward -X
 local BG = Color3.fromRGB(22, 20, 24)
 local ROW = Color3.fromRGB(44, 40, 46)
 local ON = Color3.fromRGB(150, 40, 36)
@@ -55,6 +58,49 @@ local function button(parent, text)
 	c.Parent = b
 	b.Parent = parent
 	return b
+end
+
+-- a row: [-] text [+]
+local function stepper(parent, minusText, plusText, onStep)
+	local row = Instance.new("Frame")
+	row.Size = UDim2.new(1, 0, 0, 34)
+	row.BackgroundTransparency = 1
+	local minus = button(row, minusText)
+	minus.Size = UDim2.fromOffset(44, 34)
+	minus.TextXAlignment = Enum.TextXAlignment.Center
+	local plus = button(row, plusText)
+	plus.Size = UDim2.fromOffset(44, 34)
+	plus.Position = UDim2.new(1, -44, 0, 0)
+	plus.TextXAlignment = Enum.TextXAlignment.Center
+	local text = label(row, "", 14, false)
+	text.Size = UDim2.new(1, -100, 1, 0)
+	text.Position = UDim2.fromOffset(50, 0)
+	text.TextXAlignment = Enum.TextXAlignment.Center
+	minus.Activated:Connect(function()
+		onStep(-1)
+	end)
+	plus.Activated:Connect(function()
+		onStep(1)
+	end)
+	row.Parent = parent
+	return row, text
+end
+
+local function windNow()
+	local speed = workspace:GetAttribute("WindSpeed")
+	local yaw = workspace:GetAttribute("WindYaw")
+	return typeof(speed) == "number" and speed or W.Speed, typeof(yaw) == "number" and yaw or W.Yaw
+end
+
+local function refreshWind()
+	if not ui.WindSpeed then
+		return
+	end
+	local speed, yaw = windNow()
+	local feel = speed >= W.FullSpeed and "gale" or speed >= W.HighSpeed and "strong"
+		or speed >= W.CalmSpeed and "breeze" or "calm"
+	ui.WindSpeed.Text = string.format("Speed  %d  (%s)", speed, feel)
+	ui.WindYaw.Text = string.format("Blowing toward  %s  (%d°)", COMPASS[math.round((yaw % 360) / 45) % 8 + 1], yaw % 360)
 end
 
 local function refresh(ctx)
@@ -186,6 +232,22 @@ function LoadoutMenu.Init(ctx)
 			task.delay(0.25, refresh, ctx)
 		end)
 	end
+	add(label(panel, "Wind - for everyone on the server", 16, true))
+	local speedRow, speedText = stepper(panel, "-", "+", function(dir)
+		local speed, yaw = windNow()
+		remote:FireServer("Wind", math.clamp(speed + dir * W.SpeedStep, 0, W.MaxSpeed), yaw)
+	end)
+	add(speedRow)
+	local yawRow, yawText = stepper(panel, "<", ">", function(dir)
+		local speed, yaw = windNow()
+		remote:FireServer("Wind", speed, (yaw - dir * W.YawStep) % 360) -- < turns it left (counterclockwise)
+	end)
+	add(yawRow)
+	ui.WindSpeed, ui.WindYaw = speedText, yawText
+	refreshWind()
+	workspace:GetAttributeChangedSignal("WindSpeed"):Connect(refreshWind)
+	workspace:GetAttributeChangedSignal("WindYaw"):Connect(refreshWind)
+
 	ui.Status = add(label(panel, "", 13, false))
 	ui.Status.TextColor3 = Color3.fromRGB(255, 120, 100)
 	ui.Status.TextWrapped = true
