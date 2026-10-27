@@ -3,7 +3,9 @@
 	Sever, Decapitation, KickLanded, KickBlocked). The server picks the sound and tells every client
 	(SoundEvent remote); each client plays it where it happens (client SoundPlayer, which preloads
 	every id when it starts).
-	A slot with no ids uses its Fallback slot, or plays nothing.
+	A slot with no ids uses its Fallback slot, or plays nothing. Play(name, position, after) also
+	plays slot `after` at the same place once the first sound has finished (straight away when
+	the first slot is empty).
 	Every id is preloaded at startup. One that fails to load is reported in the output
 	("[RR] sound ... failed to load") and skipped from then on, so the slot uses its other ids or
 	its Fallback. In Studio, ServerStorage.RR_DevCommand:Invoke("playSound", "Cut") plays a slot
@@ -56,17 +58,32 @@ local function resolve(name)
 	return nil
 end
 
-function SoundFX.Play(name, position)
+-- { id, volume, speed } of a random sound of the slot, or nil
+local function pick(name)
 	local slot, ids = resolve(name)
-	if not slot or typeof(position) ~= "Vector3" then
+	if not slot then
+		return nil
+	end
+	local lo, hi = slot.PitchMin or 1, slot.PitchMax or 1
+	return { ids[math.random(1, #ids)], slot.Volume or 1, lo + (hi - lo) * math.random() }
+end
+
+function SoundFX.Play(name, position, after)
+	if typeof(position) ~= "Vector3" then
 		return false
 	end
-	local id = ids[math.random(1, #ids)]
-	local lo, hi = slot.PitchMin or 1, slot.PitchMax or 1
+	local snd = pick(name)
+	local nextSnd = after and pick(after)
+	if not snd then
+		snd, nextSnd = nextSnd, nil
+	end
+	if not snd then
+		return false
+	end
 	-- every client plays it itself (client SoundPlayer): a sound the server creates is deleted
 	-- when the server thinks it has finished, which for a short sound is before a client that is
 	-- still downloading it ever plays it
-	remote:FireAllClients(id, position, slot.Volume or 1, lo + (hi - lo) * math.random())
+	remote:FireAllClients(snd[1], position, snd[2], snd[3], nextSnd)
 	return true
 end
 

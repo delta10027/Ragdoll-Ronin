@@ -4,7 +4,8 @@
 
 	The server watches each fighter's incantation animation (the owner's report in Owner mode,
 	OwnerSync, or its own simulation) and, if the fighter's chosen incantation is off cooldown:
-	  rub     the Incantation sound plays; flames (Shadow: dark smoke, Lightning: sparks)
+	  rub     the Incantation sound plays, then the incantation's own (Config.Sounds
+	          FireIncantation, ShadowIncantation, LightningIncantation); flames (Shadow: dark smoke, Lightning: sparks)
 	          follow the hand along the blade (an emitter on the left hand)
 	  active  once the rub is complete: the blade takes it for Duration seconds (model attribute
 	          "IncantActive" = the name, which also sends "Incantation : Fire" in the caster's
@@ -228,7 +229,8 @@ local function stepCast(f)
 				table.insert(c.Fx, fx)
 			end
 			local blade = f.Sword.Blade
-			SoundFX.Play("Incantation", (blade and blade.Parent and blade or f.Parts.UpperTorso).Position) -- as the animation starts
+			-- as the animation starts, then the incantation's own sound ("FireIncantation", ...)
+			SoundFX.Play("Incantation", (blade and blade.Parent and blade or f.Parts.UpperTorso).Position, name .. "Incantation")
 		end
 	end
 	f.WasCasting = on
