@@ -130,6 +130,7 @@ local function ownerInput(ctx, f)
 		i.AimU, i.AimV = s.AimU, s.AimV
 		i.M1, i.M2, i.Kick, i.Crouch, i.Sheath, i.Bow = s.M1, s.M2, s.Kick, s.Crouch, s.Sheath, s.Bow
 		i.Incant = s.Incant
+		i.Sprint = s.Sprint
 	end
 	return i
 end

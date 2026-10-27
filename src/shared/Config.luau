@@ -100,8 +100,29 @@ Config.Movement = {
 	GaitShoulderYaw = math.rad(6), -- ...and the shoulders the other way (arms free only)
 	GaitLean = math.rad(6), -- extra forward lean at full speed
 	ArmSwing = math.rad(32), -- free arms swing opposite to the legs (shoulder pitch at full stride)
-	ArmSwingElbow = math.rad(25), -- extra elbow bend as an arm swings forward
-	ArmRunElbow = math.rad(45), -- elbows bend toward a jog's carry at full speed
+	WalkArmElbow = math.rad(5), -- walking: the arms hang almost straight and swing from the shoulder
+	-- SHIFT (held, sword sheathed, moving forward): sprint. The arms bend and pump; the walk
+	-- blends into it with the stride (MotorController.standLegs / hangArms)
+	SprintSpeedMult = 1.7,
+	SprintMinAhead = 0.5, -- move direction . facing needed to sprint (no sprinting backwards)
+	SprintArmSwing = math.rad(55), -- shoulder pitch at full sprint stride
+	SprintElbow = math.rad(88), -- elbow bend while sprinting...
+	SprintElbowPump = math.rad(16), -- ...more as the arm drives forward, less as it swings back
+	SprintArmOut = math.rad(4), -- arms carried a little closer to the body
+	SprintLean = math.rad(9), -- extra forward lean at full sprint
+	-- sprint legs: past walking speed the stride grows only as speed ^ SprintStrideExponent, so the
+	-- extra speed comes mostly from faster steps (about 4.5 steps/s at full sprint instead of 3.3)
+	SprintStrideExponent = 0.3,
+	DutySprint = 0.34, -- each foot is down for less of the cycle: a longer flight phase
+	SprintLiftExtra = 1.1 * S, -- extra foot height in the swing loop (the heel kicks up toward the seat)
+	-- sprint swing loop (MotorController.standLegs): after toe-off the foot keeps travelling BACK
+	-- and up (heel kick), then the knee drives it through high and forward, it reaches out in front
+	-- of the landing point and paws back down onto it - one full loop per stride
+	SprintKickBack = 1.0 * S, -- how much further behind the toe-off point the heel kicks
+	SprintLiftPeak = 0.38, -- part of the swing at which the foot is highest (early: up behind)
+	SprintReachForward = 0.45 * S, -- how far past the landing point the foot reaches before pawing back
+	SprintToePoint = math.rad(35), -- toes point down/back through the heel kick
+	SprintKneeDip = math.rad(10), -- extra knee bend at mid stance (the body rides lower, legs drive harder)
 	StanceKneeBend = math.rad(16), -- least knee bend; more when the pelvis is lower (crouch, pushed down)
 	CrouchHeightFactor = 0.78, -- CTRL: stance height while crouching
 	CrouchSpeedMult = 0.5,
@@ -398,6 +419,11 @@ Config.Armor = {
 -- walking into it is slower, and from HighSpeed a fighter with the sword sheathed walking into it
 -- raises the left forearm across the face and leans in (instead of swinging that arm).
 Config.Wind = {
+	-- >>> WIND SOUND: put your audio asset id here (e.g. 1234567890 or "rbxassetid://1234567890").
+	-- A looped ambience; louder and slightly higher pitched the stronger the wind. "" = no sound.
+	SoundId = "93035214379043",
+	SoundVolume = { 0.05, 0.9 }, -- at CalmSpeed .. at MaxSpeed (silent below CalmSpeed)
+	SoundPitch = { 0.9, 1.15 }, -- at CalmSpeed .. at MaxSpeed
 	Speed = 8, -- at server start
 	Yaw = 45, -- degrees: 0 blows toward -Z (the spawn's forward), 90 toward -X
 	MaxSpeed = 60,
@@ -425,6 +451,32 @@ Config.Wind = {
 	WispWavelength = 10, -- ...one wave every this many studs downwind
 	WispTransparency = 0.82, -- the trail's most opaque point (1 = invisible)
 	WispTrailLength = 9, -- studs of trail behind each wisp's head
+}
+
+-- Rain (client WeatherView): one rain for the whole server, Intensity 0 (off) .. 1 (downpour), kept
+-- on the workspace (attribute "RainIntensity") and changed from the loadout menu (M) like the
+-- wind. Each client draws it around its own camera: streaks that slant with the wind, splashes on
+-- the ground nearby, a slightly darker, greyer grade, and the rain sound below.
+Config.Rain = {
+	-- >>> RAIN SOUND: put your audio asset id here (e.g. 1234567890 or "rbxassetid://1234567890").
+	-- A looped ambience; its volume follows the intensity. "" = no sound.
+	SoundId = "1516791621",
+	SoundVolume = 0.8, -- at full intensity
+	Intensity = 0, -- at server start
+	Step = 0.25, -- menu - / +
+	Area = 100, -- studs: square of rain around the camera
+	Height = 45, -- studs above the camera the drops start
+	FallSpeed = { 75, 95 }, -- studs/s
+	WindDrift = 0.6, -- how much of the wind's velocity the drops carry (slant)
+	MaxDrops = 3200, -- drops per second at full intensity
+	DropSize = 0.18, -- studs
+	DropSquash = -2.6, -- ParticleEmitter.Squash: negative stretches each drop along its fall into a streak
+	DropColor = Color3.fromRGB(195, 210, 228),
+	DropTransparency = 0.35,
+	MaxSplashes = 500, -- per second at full intensity
+	SplashArea = 70, -- studs: square of splashes around the camera
+	Darken = -0.06, -- ColorCorrection brightness at full intensity
+	Desaturate = -0.15, -- ColorCorrection saturation at full intensity
 }
 
 -- The Cloak's cape (client CloakView): a cloth of Cols x Rows points pinned across the back of the
