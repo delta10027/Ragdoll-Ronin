@@ -2,7 +2,8 @@
 	SoundPlayer: plays the combat sounds the server announces (server SoundFX, SoundEvent remote)
 	at the place they happen. Every Config.Sounds id is preloaded when the client starts, so even a
 	very short sound is ready the moment it is needed. Each sound lives on its own attachment under
-	Terrain until it has finished.
+	Terrain until it has finished; a sound sent with a next one ({ id, volume, speed }) plays that
+	one at the same place as soon as it ends.
 ]]
 local ContentProvider = game:GetService("ContentProvider")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -22,7 +23,7 @@ local function assetId(id)
 	return nil
 end
 
-local function play(id, position, volume, speed)
+local function play(id, position, volume, speed, nextSnd)
 	if typeof(id) ~= "string" or typeof(position) ~= "Vector3" then
 		return
 	end
@@ -39,6 +40,9 @@ local function play(id, position, volume, speed)
 	att.Parent = workspace.Terrain
 	s.Ended:Once(function()
 		att:Destroy()
+		if typeof(nextSnd) == "table" then
+			play(nextSnd[1], position, nextSnd[2], nextSnd[3])
+		end
 	end)
 	task.delay(15, function()
 		if att.Parent then
