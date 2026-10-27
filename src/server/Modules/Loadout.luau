@@ -6,6 +6,7 @@
 	The choices are kept on the Player (attributes "Armor_<piece>", "IncantChoice") and applied
 	to every new fighter of theirs (Apply, at spawn). Putting armour on only works while standing
 	and out of combat (not hurt for Config.Armor.EquipCooldown seconds); taking it off always does.
+	Cosmetic pieces (the Cloak) go on any time.
 	Refusals come back as Feedback "LoadoutRefused" with the reason.
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -43,7 +44,9 @@ local function onRequest(player, kind, a, b)
 			end
 			return
 		end
-		if f and not f.Dead then
+		if f and not f.Dead and AR.Pieces[a].Cosmetic then
+			Armor.Equip(f, a) -- cosmetic: goes on any time
+		elseif f and not f.Dead then
 			if f.State ~= "Idle" and f.State ~= "Moving" then
 				return refuse(f, player, "Stand still to put armour on")
 			end

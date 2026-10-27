@@ -376,17 +376,42 @@ Config.Bow = {
 -- body, as a blunt blow) and costs the piece one of its Hits; at 0 the piece breaks off and the
 -- body under it is exposed. Neck, hands and feet are never covered: the gaps to aim for.
 -- Equipping only works out of combat (not hit for EquipCooldown seconds) and restores the piece.
+-- Cosmetic pieces cover no segments: they never stop a blow, never break, and go on any time.
 Config.Armor = {
 	PowerThrough = 0.2,
 	EquipCooldown = 8,
-	Order = { "Helmet", "Chest", "Arms", "Legs" },
+	Order = { "Helmet", "Chest", "Arms", "Legs", "Cloak" },
 	Pieces = {
 		Helmet = { Label = "Kabuto (helmet)", Hits = 3, Segments = { "Head" }, Color = Color3.fromRGB(30, 28, 30) },
 		Chest = { Label = "Do (chest)", Hits = 5, Segments = { "UpperTorso", "LowerTorso" }, Color = Color3.fromRGB(95, 22, 24) },
 		Arms = { Label = "Kote (sleeves)", Hits = 4, Segments = { "LeftUpperArm", "LeftForearm", "RightUpperArm", "RightForearm" }, Color = Color3.fromRGB(38, 36, 40) },
 		Legs = { Label = "Suneate (greaves)", Hits = 4, Segments = { "LeftThigh", "LeftShin", "RightThigh", "RightShin" }, Color = Color3.fromRGB(38, 36, 40) },
+		Cloak = { Label = "Cloak (cosmetic)", Cosmetic = true, Hits = 1, Segments = {}, Color = Color3.fromRGB(78, 20, 26) },
 	},
 	Inflate = 0.07 * S, -- shell thickness over each body part
+}
+
+-- The Cloak's cape (client CloakView): a cloth of Cols x Rows points pinned across the back of the
+-- shoulders, simulated locally on every client (verlet, fixed Step) and drawn as panels. It falls
+-- under gravity, is pushed by the wind and trails the fighter's motion; the torso, legs and ground
+-- keep it out.
+Config.Cloak = {
+	Cols = 4,
+	Rows = 8,
+	Length = 3.3 * S, -- shoulders to just above the knees
+	TopWidth = 1.7 * S, -- across the shoulders...
+	BottomWidth = 2.3 * S, -- ...flaring out to the hem
+	Thickness = 0.06 * S,
+	Step = 1 / 60,
+	Iterations = 6, -- constraint passes per step (higher: less stretch)
+	GravityScale = 0.45, -- of workspace.Gravity: cloth falls floatier than a body
+	Drag = 3, -- per second, pulls the cloth toward the wind's velocity
+	Wind = Vector3.new(7, 0, 3), -- studs/s
+	Gust = 0.4, -- the wind swells and falls by this fraction
+	Flutter = 0.5, -- per-point wind variation (ripples along the cape)
+	BodyMargin = 0.1 * S, -- the cape keeps this far off the torso and legs
+	SimDistance = 150, -- farther from the camera the cape is hidden and not simulated
+	ClaspColor = Color3.fromRGB(196, 158, 70),
 }
 
 -- Incantations (J, chosen in the loadout menu): the fighter holds the sword level across the
