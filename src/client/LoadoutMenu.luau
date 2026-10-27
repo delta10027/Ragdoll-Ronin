@@ -69,7 +69,7 @@ local function refresh(ctx)
 		local hits = model and model:GetAttribute("Armor_" .. piece)
 		local status
 		if typeof(hits) == "number" and hits > 0 then
-			status = string.format("worn  %d/%d", hits, def.Hits)
+			status = def.Cosmetic and "worn" or string.format("worn  %d/%d", hits, def.Hits)
 		elseif hits == 0 then
 			status = "BROKEN (click to repair)"
 		elseif wanted then

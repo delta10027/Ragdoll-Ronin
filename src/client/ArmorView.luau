@@ -1,7 +1,8 @@
 --[[
 	ArmorView: draws every fighter's armour (server Armor: model attributes "Armor_<piece>" = hits
 	left) as local shells welded over the covered body parts. When a piece breaks (hits reach 0)
-	its shells come off and tumble away. Local parts only: nothing replicates, the bodies'
+	its shells come off and tumble away. The Cloak is built by CloakView instead (collar, mantle
+	and a simulated cape). Local parts only: nothing replicates, the bodies'
 	physics and network ownership are untouched.
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -9,6 +10,7 @@ local Debris = game:GetService("Debris")
 local Shared = ReplicatedStorage:WaitForChild("RagdollRonin")
 local Config = require(Shared:WaitForChild("Config"))
 local Anatomy = require(Shared:WaitForChild("Anatomy"))
+local CloakView = require(script.Parent.CloakView)
 
 local ArmorView = {}
 local AR = Config.Armor
@@ -76,6 +78,9 @@ local function refresh(model, piece)
 		end
 		local def = AR.Pieces[piece]
 		local list = {}
+		if piece == "Cloak" then
+			list = CloakView.Build(model, def.Color, folder)
+		end
 		for _, seg in ipairs(def.Segments) do
 			for _, name in ipairs(Anatomy.SegmentParts[seg] or {}) do
 				local part = model:FindFirstChild(name)
@@ -107,6 +112,7 @@ function ArmorView.Init(ctx)
 	folder = Instance.new("Folder")
 	folder.Name = "RR_Armor"
 	folder.Parent = workspace
+	CloakView.Init(ctx)
 	workspace.ChildAdded:Connect(watch)
 	workspace.ChildRemoved:Connect(function(model)
 		local byPiece = shells[model]
