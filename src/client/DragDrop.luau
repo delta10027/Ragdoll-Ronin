@@ -13,6 +13,7 @@
 	a target that accepts it, it shrinks into it; anywhere else it flies back and fades.
 ]]
 local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 local Theme = require(script.Parent.UITheme)
 
 local DragDrop = {}
@@ -81,7 +82,7 @@ local function begin(p)
 	scale.Scale = 0.8
 	Theme.tween(scale, 0.18, { Scale = 1.05 }, Enum.EasingStyle.Back)
 	Theme.tween(ghost, 0.18, { Rotation = -6 })
-	drag = { Payload = p.Payload, Ghost = ghost, Source = p.Source, Home = p.Source.AbsolutePosition + p.Source.AbsoluteSize / 2 }
+	drag = { Payload = p.Payload, Ghost = ghost, Source = p.Source, Touch = p.Touch, Home = p.Source.AbsolutePosition + p.Source.AbsoluteSize / 2 }
 	if p.Payload.OnStart then
 		p.Payload.OnStart()
 	end
@@ -129,17 +130,23 @@ local function finish(pos)
 	end)
 end
 
+local function press(button, getPayload, onClick, touch)
+	if drag then
+		return
+	end
+	-- (GetMouseLocation, not io.Position: the same space as the menus, which ignore the GUI inset)
+	pending = { Payload = getPayload(), Start = UserInputService:GetMouseLocation(), Source = button, Click = onClick, Touch = touch }
+end
+
 function DragDrop.Source(button, getPayload, onClick)
+	-- a button's own press: InputBegan is not reliably passed on by a GuiButton for its button
+	button.MouseButton1Down:Connect(function()
+		press(button, getPayload, onClick, false)
+	end)
 	button.InputBegan:Connect(function(io)
-		if io.UserInputType ~= Enum.UserInputType.MouseButton1 and io.UserInputType ~= Enum.UserInputType.Touch then
-			return
+		if io.UserInputType == Enum.UserInputType.Touch then
+			press(button, getPayload, onClick, true)
 		end
-		if drag then
-			return
-		end
-		local payload = getPayload()
-		-- (GetMouseLocation, not io.Position: the same space as the menus, which ignore the GUI inset)
-		pending = { Payload = payload, Start = UserInputService:GetMouseLocation(), Source = button, Click = onClick }
 	end)
 end
 
@@ -173,11 +180,29 @@ function DragDrop.Init(_ctx, playerGui)
 		DisplayOrder = 40,
 		Parent = playerGui,
 	})
-	UserInputService.InputChanged:Connect(function(io)
-		if io.UserInputType ~= Enum.UserInputType.MouseMovement and io.UserInputType ~= Enum.UserInputType.Touch then
+	-- follow the mouse every frame while a button is held (movement and release events can be
+	-- swallowed by the GUI under the cursor), and act when it is let go
+	local function released(pos)
+		if drag then
+			finish(pos)
+		elseif pending then
+			local p = pending
+			pending = nil
+			if p.Click then
+				p.Click()
+			end
+		end
+	end
+	RunService.RenderStepped:Connect(function()
+		if not pending and not drag then
 			return
 		end
 		local pos = UserInputService:GetMouseLocation()
+		local touch = (pending and pending.Touch) or (drag and drag.Touch)
+		if not touch and not UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+			released(pos)
+			return
+		end
 		if pending and not drag and pending.Payload and (pos - pending.Start).Magnitude > 6 then
 			begin(pending)
 			pending = nil
@@ -185,17 +210,8 @@ function DragDrop.Init(_ctx, playerGui)
 		move(pos)
 	end)
 	UserInputService.InputEnded:Connect(function(io)
-		if io.UserInputType ~= Enum.UserInputType.MouseButton1 and io.UserInputType ~= Enum.UserInputType.Touch then
-			return
-		end
-		if drag then
-			finish(UserInputService:GetMouseLocation())
-		elseif pending then
-			local p = pending
-			pending = nil
-			if p.Click then
-				p.Click()
-			end
+		if io.UserInputType == Enum.UserInputType.Touch then
+			released(UserInputService:GetMouseLocation())
 		end
 	end)
 end
