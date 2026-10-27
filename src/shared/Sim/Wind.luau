@@ -1,7 +1,7 @@
 --[[
 	Wind: the server's one wind (Config.Wind), read from the workspace attributes "WindSpeed"
 	(studs/s) and "WindYaw" (degrees: 0 blows toward -Z, 90 toward -X). The server's Loadout sets
-	them (menu M); before they replicate the Config defaults are used.
+	them (creative menu M, Weather); before they replicate the Config defaults are used.
 
 	Shared: the fighters' controllers (MotorController: walking into it is slower, covering the
 	face) run it on the server and on a predicting client; the client's WindView and CloakView

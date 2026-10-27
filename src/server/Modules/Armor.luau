@@ -2,10 +2,10 @@
 	Armor: the fighter's armour pieces (Config.Armor) and what a blade does to them.
 
 	f.Armor[piece] = hits left (absent = not worn). Mirrored on the model as "Armor_<piece>" so
-	every client can draw it (client ArmorView) and the owner's loadout menu can show it. A
+	every client can draw it (client ArmorView) and the owner's inventory can show it. A
 	damaging hit on a covered segment is stopped (CombatResolver) and costs the piece a hit; at 0
 	it breaks off ("Armor_<piece>" = 0) and the segment is exposed until the piece is re-equipped
-	(out of combat) or the fighter respawns.
+	(out of combat) or the fighter respawns. What is worn comes from the inventory (Loadout).
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.RagdollRonin.Config)

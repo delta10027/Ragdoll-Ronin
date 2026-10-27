@@ -1,9 +1,10 @@
 --[[
 	ArmorView: draws every fighter's armour (server Armor: model attributes "Armor_<piece>" = hits
 	left) as local shells welded over the covered body parts. When a piece breaks (hits reach 0)
-	its shells come off and tumble away. The Cloak is built by CloakView instead (collar, mantle
-	and a simulated cape). Local parts only: nothing replicates, the bodies'
-	physics and network ownership are untouched.
+	its shells come off and tumble away. Cloth (Cloak, Cape, Scarf) is built by CloakView, the
+	rest of the clothing (hat, bags, sandals) by GearView, by the piece's View. Local parts only:
+	nothing replicates, the bodies' physics and network ownership are untouched.
+	BuildPiece also dresses the inventory's figure and draws the item icons (ItemArt).
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Debris = game:GetService("Debris")
@@ -11,25 +12,26 @@ local Shared = ReplicatedStorage:WaitForChild("RagdollRonin")
 local Config = require(Shared:WaitForChild("Config"))
 local Anatomy = require(Shared:WaitForChild("Anatomy"))
 local CloakView = require(script.Parent.CloakView)
+local GearView = require(script.Parent.GearView)
 
 local ArmorView = {}
 local AR = Config.Armor
 local folder
 local shells = setmetatable({}, { __mode = "k" }) -- model -> piece -> { shell parts }
 
-local function shellFor(part, piece, color)
+local function shellFor(part, piece, def, folder)
 	local s = Instance.new("Part")
 	s.Name = "Armor_" .. piece
 	local size = part.Size + Vector3.one * (2 * AR.Inflate)
 	local cf = part.CFrame
-	if piece == "Helmet" then
+	if def.View == "Helmet" then
 		-- a kabuto over the top of the head, the face left open
 		size = Vector3.new(size.X, part.Size.Y * 0.55, size.Z)
 		cf = cf * CFrame.new(0, part.Size.Y * 0.3, 0)
 	end
 	s.Size = size
 	s.CFrame = cf
-	s.Color = color
+	s.Color = def.Color
 	s.Material = Enum.Material.SmoothPlastic
 	s.Reflectance = 0.08
 	s.Massless = true
@@ -76,24 +78,39 @@ local function refresh(model, piece)
 		if has then
 			return
 		end
-		local def = AR.Pieces[piece]
-		local list = {}
-		if piece == "Cloak" then
-			list = CloakView.Build(model, def.Color, folder)
-		end
-		for _, seg in ipairs(def.Segments) do
-			for _, name in ipairs(Anatomy.SegmentParts[seg] or {}) do
-				local part = model:FindFirstChild(name)
-				if part and part:IsA("BasePart") then
-					table.insert(list, shellFor(part, piece, def.Color))
-				end
-			end
-		end
 		shells[model] = shells[model] or {}
-		shells[model][piece] = list
+		shells[model][piece] = ArmorView.BuildPiece(model, piece, folder)
 	else
 		clear(model, piece, hits == 0) -- 0: broken; nil: taken off
 	end
+end
+
+-- builds piece's look on model into folder; returns its parts. opts go to CloakView (a figure in a
+-- ViewportFrame: Wind, Static)
+function ArmorView.BuildPiece(model, piece, into, opts)
+	local def = AR.Pieces[piece]
+	if not def then
+		return {}
+	end
+	local list = {}
+	if def.View == "Cloak" or def.View == "Cape" or def.View == "Scarf" then
+		list = CloakView.Build(model, def.View, def.Color, into, opts)
+	elseif GearView.Has(def.View) then
+		local colliders
+		list, colliders = GearView.Build(def.View, model, def.Color, into)
+		if colliders then
+			CloakView.AddColliders(model, colliders)
+		end
+	end
+	for _, seg in ipairs(def.Segments) do
+		for _, name in ipairs(Anatomy.SegmentParts[seg] or {}) do
+			local part = model:FindFirstChild(name)
+			if part and part:IsA("BasePart") then
+				table.insert(list, shellFor(part, piece, def, into))
+			end
+		end
+	end
+	return list
 end
 
 local function watch(model)

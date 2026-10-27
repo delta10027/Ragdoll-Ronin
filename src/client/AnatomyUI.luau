@@ -159,7 +159,7 @@ function AnatomyUI.Init(ctx)
 
 	-- text column
 	ui.State = label(panel, "", 13, UDim2.fromOffset(138, 8), UDim2.fromOffset(214, 16))
-	ui.State.Font = Enum.Font.GothamBold
+	ui.State.FontFace = Font.new("rbxasset://fonts/families/BuilderSans.json", Enum.FontWeight.Bold)
 	ui.Injuries = label(panel, "", 11, UDim2.fromOffset(138, 28), UDim2.fromOffset(214, 92))
 	ui.Injuries.TextWrapped = true
 	ui.Injuries.RichText = true
