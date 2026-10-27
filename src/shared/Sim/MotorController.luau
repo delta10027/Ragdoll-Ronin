@@ -375,6 +375,21 @@ local function solveOffArm(st, target, dt)
 end
 
 ------------------------------------------------------------------ poses
+-- Covering the face from the wind (Config.Wind): the left upper arm points along CoverElbowDir and
+-- the forearm toward CoverHand, so it lies across the face (the head tucks and turns into it). Fixed in upper-torso space, so solved
+-- once here (rest frame as in armFrame: limb along -Y, elbow flexion about +X toward -Z).
+local COVER_SHOULDER, COVER_ELBOW
+do
+	local W = Config.Wind
+	local u = W.CoverElbowDir.Unit
+	local elbow = SHOULDER.Left + u * L1
+	local fore = Util.unit(W.CoverHand * S - elbow, u)
+	local Y = -u
+	local Z = -Util.perpendicular(fore, u, Vector3.zAxis)
+	COVER_SHOULDER = clampSwingTwist(CFrame.fromMatrix(Vector3.zero, Y:Cross(Z), Y, Z), SHOULDER_CONE, SHOULDER_TWIST)
+	COVER_ELBOW = math.acos(math.clamp(u:Dot(fore), -1, 1))
+end
+
 -- An arm not holding anything hangs at the side; walking, it swings opposite to the leg on its
 -- side (f.GaitArm, set by standLegs: + = forward), the elbow bending more as it comes forward
 local function hangArms(pose, side, f)
@@ -634,7 +649,7 @@ local function uprightPose(f, dt)
 	lean += rad(W.CoverLean) * cover -- leaning into the wind
 	pose.Waist = CFrame.Angles(0, torsoYaw, 0) * CFrame.Angles(-lean, 0, 0)
 	pose.NeckBase = CFrame.Angles(0, -twist * 0.5, 0)
-	pose.NeckHead = CFrame.Angles(lean * 0.5 - rad(W.CoverHeadDown) * cover, -twist * 0.5, 0)
+	pose.NeckHead = CFrame.Angles(lean * 0.5 - rad(W.CoverHeadDown) * cover, -twist * 0.5 - rad(W.CoverHeadTurn) * cover, 0)
 	if f.Caps.Kneeling then
 		kneelLegs(f, pose)
 	else
@@ -679,9 +694,8 @@ local function uprightPose(f, dt)
 	if cover > 0 then
 		-- the left forearm comes up across the face, blended from the walking arm swing
 		hangArms(pose, "Left", f)
-		local shield = CFrame.Angles(rad(W.CoverShoulderPitch), 0, rad(W.CoverShoulderRoll))
-		pose.LeftShoulder = pose.LeftShoulder:Lerp(shield, cover)
-		pose.LeftElbow += (rad(W.CoverElbow) - pose.LeftElbow) * cover
+		pose.LeftShoulder = pose.LeftShoulder:Lerp(COVER_SHOULDER, cover)
+		pose.LeftElbow += (COVER_ELBOW - pose.LeftElbow) * cover
 	end
 	armPose(f, pose)
 	return pose

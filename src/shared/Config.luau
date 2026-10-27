@@ -406,13 +406,16 @@ Config.Wind = {
 	HighSpeed = 25, -- from here the fighters feel it...
 	FullSpeed = 50, -- ...fully from here
 	IntoSlow = 0.45, -- walking straight into full wind loses this fraction of the walk speed
-	-- covering the face: the left upper arm comes up forward and in, the forearm folds up across
-	-- the face (degrees; shoulder pitch + forward, roll + toward the body's middle)
-	CoverShoulderPitch = 85,
-	CoverShoulderRoll = 28,
-	CoverElbow = 118,
+	-- covering the face: the left elbow comes forward in front of the chest and the forearm runs up
+	-- across the face to the hand by the right temple, while the head tucks down and turns right
+	-- into the arm (upper-torso space, unscaled: +X the fighter's right, +Y up, -Z forward; the
+	-- face is about Y 1.3 to 2.3, Z -0.5). Chosen by measuring how much of the face the arm hides
+	-- from the front, a raised camera and either side, keeping the arm out of the head.
+	CoverElbowDir = Vector3.new(0.57, 0.29, -0.77), -- from the left shoulder: forward, in, a little up
+	CoverHand = Vector3.new(0.7, 1.8, -1.1), -- reached for along the forearm (as far as it goes)
 	CoverLean = 10, -- degrees of extra forward lean while covering the face
-	CoverHeadDown = 14, -- degrees the head tucks down behind the arm
+	CoverHeadDown = 40, -- degrees the head tucks down (about 35 net of the lean it rides on)
+	CoverHeadTurn = 25, -- degrees the head turns right, into the arm
 	-- streaks (client WindView): each a short wavy trail flying downwind near the camera
 	Wisps = 36, -- at FullSpeed (fewer in lighter wind, none below CalmSpeed)
 	CalmSpeed = 2,
