@@ -13,8 +13,9 @@
 	  ("Wind", speed, yaw)       the server's wind (Config.Wind; anyone may change it)
 	  ("Rain", intensity 0..1)   the server's rain (Config.Rain; anyone may change it)
 	`key` is the item the client saw in that cell: a request made on a stale view is ignored.
-	A player's inventory is kept for the session and mirrored to them as the Player attribute
-	"RR_Inventory" (JSON: Items, Equipped, Book, Capacity). What is equipped is put on every new
+	A player's inventory is kept for the session and mirrored to them as the StringValue
+	"RR_Inventory" under the Player (JSON: Items, Equipped, Book, Capacity; a StringValue, as
+	attribute strings are limited to 50 characters). What is equipped is put on every new
 	fighter of theirs (Apply, at spawn); the book sets the incantation J casts ("IncantChoice").
 	Armour only goes on while standing and out of combat (not hurt for Config.Armor.EquipCooldown
 	seconds); cosmetic pieces go on any time and taking anything off always works.
@@ -49,12 +50,18 @@ local function inventoryOf(player)
 end
 
 local function publish(player, s)
-	player:SetAttribute("RR_Inventory", HttpService:JSONEncode({
+	local value = player:FindFirstChild("RR_Inventory")
+	if not value then
+		value = Instance.new("StringValue")
+		value.Name = "RR_Inventory"
+		value.Parent = player
+	end
+	value.Value = HttpService:JSONEncode({
 		Items = s.Items,
 		Equipped = s.Equipped,
 		Book = s.Book,
 		Capacity = capacityWith(s.Equipped.Back),
-	}))
+	})
 end
 
 local function refuse(player, why)

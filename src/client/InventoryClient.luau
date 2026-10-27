@@ -1,6 +1,6 @@
 --[[
-	InventoryClient: this player's inventory as the server keeps it (server Loadout: the Player
-	attribute "RR_Inventory"), for the menus.
+	InventoryClient: this player's inventory as the server keeps it (server Loadout: the
+	StringValue "RR_Inventory" under the Player), for the menus.
 	  Data            { Items = { key, ... }, Equipped = { [slot] = key }, Book = key?, Capacity }
 	  OnChanged(fn)   called with Data whenever it (or the fighter's armour) changes
 	  Send(...)       a request on the Loadout remote ("Equip", index, key), ...
@@ -80,12 +80,8 @@ function InventoryClient.Accent(key, theme)
 	return AR.Pieces[key].Cosmetic and theme.Colors.Cosmetic or theme.Colors.Armour
 end
 
-local function decode(player)
-	local raw = player:GetAttribute("RR_Inventory")
-	if typeof(raw) ~= "string" then
-		return
-	end
-	local ok, data = pcall(HttpService.JSONDecode, HttpService, raw)
+local function decode(value)
+	local ok, data = pcall(HttpService.JSONDecode, HttpService, value.Value)
 	if not ok or typeof(data) ~= "table" then
 		return
 	end
@@ -100,10 +96,13 @@ end
 
 function InventoryClient.Init(ctx)
 	remote = ctx.Remotes:WaitForChild("Loadout")
-	ctx.Player:GetAttributeChangedSignal("RR_Inventory"):Connect(function()
-		decode(ctx.Player)
+	task.spawn(function()
+		local value = ctx.Player:WaitForChild("RR_Inventory")
+		value.Changed:Connect(function()
+			decode(value)
+		end)
+		decode(value)
 	end)
-	decode(ctx.Player)
 end
 
 -- a new fighter: follow its armour (hits left, broken), and announce its incantations in chat

@@ -422,8 +422,8 @@ Config.Armor = {
 }
 
 -- The inventory (TAB > Character): a grid of the items a player carries and five equipment slots.
--- Kept by the server (Loadout) for the session and mirrored to the owner as the Player attribute
--- "RR_Inventory" (JSON). A bag in the Back slot adds its Capacity to the grid. The incantation
+-- Kept by the server (Loadout) for the session and mirrored to the owner as the StringValue
+-- "RR_Inventory" (JSON) under the Player. A bag in the Back slot adds its Capacity to the grid. The incantation
 -- book set on the sword (TAB > Weapon) is the one J casts.
 Config.Inventory = {
 	Capacity = 16, -- grid cells without a bag
