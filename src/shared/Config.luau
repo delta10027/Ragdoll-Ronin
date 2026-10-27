@@ -444,7 +444,7 @@ Config.Inventory = {
 		Head = "Helmets, hats", Neck = "Scarves, cloaks, capes, haori", Chest = "Chest armour", Sleeve = "Arm armour",
 		Back = "Bags", Legs = "Leg armour", Boots = "Boots",
 	},
-	Starter = { "Kabuto", "Cloak", "Haori", "Suneate", "BookFire", "BookShadow" }, -- what a player joins with (the first book goes on the sword)
+	Starter = { "Kabuto", "Cloak", "Haori", "Suneate", "BookFire", "BookShadow", "BookLightning" }, -- what a player joins with (the first book goes on the sword)
 	Creative = true, -- the creative menu (M) may give items (false: nobody can)
 }
 
@@ -452,7 +452,7 @@ Config.Inventory = {
 -- (its look and armour are Config.Armor.Pieces[key]); "Book" carries an incantation
 -- (Config.Incantations) and is set on the sword. Capacity: extra grid cells a bag gives.
 Config.Items = {
-	Order = { "Kabuto", "Kasa", "Cloak", "Cape", "Scarf", "Haori", "Do", "Kote", "Satchel", "TravelPack", "Suneate", "Kogake", "Waraji", "BookFire", "BookShadow" },
+	Order = { "Kabuto", "Kasa", "Cloak", "Cape", "Scarf", "Haori", "Do", "Kote", "Satchel", "TravelPack", "Suneate", "Kogake", "Waraji", "BookFire", "BookShadow", "BookLightning" },
 	Kabuto = { Kind = "Wear", Slot = "Head", Description = "A lacquered war helmet. Turns aside blows to the head." },
 	Kasa = { Kind = "Wear", Slot = "Head", Description = "A wide straw hat against sun and rain." },
 	Cloak = { Kind = "Wear", Slot = "Neck", Description = "A heavy cloak with a mantle over the shoulders. Flows in the wind." },
@@ -467,6 +467,7 @@ Config.Items = {
 	Kogake = { Kind = "Wear", Slot = "Boots", Description = "Armoured foot covers." },
 	Waraji = { Kind = "Wear", Slot = "Boots", Description = "Woven straw sandals, tied at the ankle." },
 	BookFire = { Kind = "Book", Label = "Book of Fire", Incantation = "Fire", Color = Color3.fromRGB(176, 52, 28), Gem = Color3.fromRGB(255, 150, 60), Glow = Color3.fromRGB(255, 120, 40), Description = "Set on the sword, its incantation makes the blade burn." },
+	BookLightning = { Kind = "Book", Label = "Book of Lightning", Incantation = "Lightning", Color = Color3.fromRGB(32, 44, 78), Gem = Color3.fromRGB(150, 210, 255), Glow = Color3.fromRGB(110, 170, 255), Description = "Set on the sword, its incantation charges you with lightning: every kick shoots a bolt that throws back whoever it strikes." },
 	BookShadow = { Kind = "Book", Label = "Book of Shadow", Incantation = "Shadow", Color = Color3.fromRGB(34, 26, 42), Gem = Color3.fromRGB(150, 90, 230), Glow = Color3.fromRGB(90, 50, 140), Description = "Set on the sword, its incantation sinks the blade into shadow: hard to see coming, and its wounds cloud the eyes." },
 }
 for _, key in ipairs(Config.Items.Order) do
@@ -623,7 +624,8 @@ Config.Cloak = {
 -- Incantations (J, from the book set on the sword: TAB > Weapon): the fighter holds the sword level across the
 -- chest and runs the free hand along the flat from the guard to the tip (Shared.Sim.Incant);
 -- the blade then takes the incantation for Duration seconds ("Incantation : Fire" in chat).
--- Fire burns; Shadow hides the blade and shrouds what it wounds (Config.Incantations).
+-- Fire burns; Shadow hides the blade and shrouds what it wounds; Lightning makes each kick
+-- shoot a bolt (Config.Incantations).
 Config.Incant = {
 	RaiseTime = 0.4, -- the blade comes level across the chest, the left hand to the guard
 	RubTime = 1.0, -- the hand runs along the flat to the tip
@@ -635,7 +637,7 @@ Config.Incant = {
 	HandAbove = 0.2, -- the palm rides this far above the blade's centre line (scaled)
 }
 Config.Incantations = {
-	Order = { "Fire", "Shadow" },
+	Order = { "Fire", "Shadow", "Lightning" },
 	Fire = {
 		Label = "Fire",
 		Duration = 25, -- seconds the blade burns
@@ -660,6 +662,23 @@ Config.Incantations = {
 		ShroudBalancePerSecond = 5,
 		ShroudDarken = 0.35, -- how far the shrouded fighter's sight darkens (ColorCorrection brightness)
 	},
+	-- the blade crackles with sparks; while it lasts every kick shoots a lightning bolt from the
+	-- foot straight ahead (stopped by walls). A fighter it strikes is shocked: the body part it
+	-- strikes (the sword hand, when it strikes the sword) is hurt, they are thrown back and lose
+	-- balance, knocked down with none left. It goes through armour.
+	Lightning = {
+		Label = "Lightning",
+		Duration = 20,
+		Cooldown = 40,
+		PowerMult = 1,
+		BoltRange = 45, -- studs
+		BoltRadius = 0.7 * S, -- how wide the bolt strikes (a spherecast)
+		BoltColor = Color3.fromRGB(150, 200, 255),
+		ShockDamage = 18, -- integrity (of 100) the struck part loses
+		ShockBalance = 40,
+		ShockKnockbackDV = 18,
+		ShockStaggerTime = 0.8,
+	},
 }
 
 -- Sound effects (server SoundFX). Put Roblox audio asset ids in Ids, as numbers or
@@ -683,6 +702,8 @@ Config.Sounds = {
 	Incantation = { Ids = {}, Volume = 0.9, PitchMin = 1, PitchMax = 1 }, -- an incantation takes hold of the blade
 	FireHit = { Ids = {}, Volume = 0.8, PitchMin = 0.9, PitchMax = 1.1 }, -- a burning blade sets a body part alight
 	ShadowHit = { Ids = {}, Volume = 0.8, PitchMin = 0.85, PitchMax = 1.0 }, -- a shadowed blade shrouds a body part
+	Lightning = { Ids = {}, Volume = 1, PitchMin = 0.9, PitchMax = 1.1 }, -- a lightning kick shoots its bolt (from the foot)
+	LightningHit = { Ids = {}, Volume = 0.9, PitchMin = 0.9, PitchMax = 1.1 }, -- the bolt strikes a fighter
 	RollOffMaxDistance = 120,
 	SlashCooldown = 0.2, -- per fighter: fast back-and-forth strokes do not stack whooshes
 	HitSoundCooldown = 0.4, -- per attacker: one cut sound for a blade passing through several body parts
