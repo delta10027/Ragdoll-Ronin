@@ -695,7 +695,7 @@ Config.Sounds = {
 	Decapitation = { Ids = { 140325083438865 }, Volume = 1, PitchMin = 0.95, PitchMax = 1.05, Fallback = "Sever" },
 	KickLanded = { Ids = { 135240815029802 }, Volume = 0.9, PitchMin = 0.9, PitchMax = 1.1 }, -- a teep lands
 	KickBlocked = { Ids = { 136811265205147 }, Volume = 0.8, PitchMin = 0.95, PitchMax = 1.05, Fallback = "Block" }, -- a teep checked by the guard
-	Draw = { Ids = { 70877430872922 }, Volume = 0.8, PitchMin = 0.95, PitchMax = 1.05 }, -- drawing the katana (1)
+	Draw = { Ids = { 608618332 }, Volume = 0.8, PitchMin = 0.95, PitchMax = 1.05 }, -- drawing the katana (1)
 	Sheathe = { Ids = { 103523867942055 }, Volume = 0.8, PitchMin = 0.95, PitchMax = 1.05 }, -- sheathing it
 	ArmorHit = { Ids = { 127507513522810 }, Volume = 0.9, PitchMin = 0.85, PitchMax = 1.0, Fallback = "Block" }, -- a blade stopped by armour
 	ArmorBreak = { Ids = { 9116673678 }, Volume = 1, PitchMin = 0.9, PitchMax = 1.0, Fallback = "Clash" }, -- an armour piece breaks
