@@ -699,7 +699,7 @@ Config.Sounds = {
 	Sheathe = { Ids = { 103523867942055 }, Volume = 0.8, PitchMin = 0.95, PitchMax = 1.05 }, -- sheathing it
 	ArmorHit = { Ids = { 127507513522810 }, Volume = 0.9, PitchMin = 0.85, PitchMax = 1.0, Fallback = "Block" }, -- a blade stopped by armour
 	ArmorBreak = { Ids = { 9116673678 }, Volume = 1, PitchMin = 0.9, PitchMax = 1.0, Fallback = "Clash" }, -- an armour piece breaks
-	Incantation = { Ids = { 139481660862096 }, Volume = 0.9, PitchMin = 1, PitchMax = 1 }, -- an incantation takes hold of the blade
+	Incantation = { Ids = { 139481660862096 }, Volume = 0.9, PitchMin = 1, PitchMax = 1 }, -- an incantation is cast (as the animation starts)
 	FireHit = { Ids = { 139419162875767 }, Volume = 0.8, PitchMin = 0.9, PitchMax = 1.1 }, -- a burning blade sets a body part alight
 	ShadowHit = { Ids = { 105217258429246 }, Volume = 0.8, PitchMin = 0.85, PitchMax = 1.0 }, -- a shadowed blade shrouds a body part
 	Lightning = { Ids = { 138687206526097 }, Volume = 1, PitchMin = 0.9, PitchMax = 1.1 }, -- a lightning kick shoots its bolt (from the foot)
