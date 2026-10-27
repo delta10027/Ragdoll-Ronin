@@ -9,12 +9,13 @@
 	  * releasing both: the cursor relaxes back to the ready stance (the server does the same)
 	  * C: teep (push kick). A tap is held for KICK_HOLD seconds so the simulation always sees it.
 	  * CTRL (held): crouch
+	  * SHIFT (held): sprint (only with the sword sheathed and moving forward)
 	  * 1: draw / sheathe the sword (animated, Shared.Sim.Draw); a tap held like the kick
 	  * G: bow (Shared.Sim.Bow); a tap held like the kick
 	  * J: incantation (Shared.Sim.Incant); a tap held like the kick
 	Packet (packed into a buffer, Shared.Sim.InputPacket): seq, moveX, moveZ, yaw, aimU, aimV,
 	  buttons (bit0 = M1, bit1 = M2, bit2 = kick, bit3 = crouch, bit4 = draw/sheathe, bit5 = bow,
-	  bit6 = incantation)
+	  bit6 = incantation, bit7 = sprint)
 ]]
 local UserInputService = game:GetService("UserInputService")
 local GuiService = game:GetService("GuiService")
@@ -40,6 +41,7 @@ function InputController.Init(ctx)
 		Kick = false,
 		KickUntil = 0,
 		Crouch = false,
+		Sprint = false,
 		Sheath = false,
 		SheathUntil = 0,
 		Bow = false,
@@ -107,6 +109,7 @@ function InputController.Update(ctx, dt)
 	s.Bow = not blocked and os.clock() < s.BowUntil
 	s.Incant = not blocked and os.clock() < s.IncantUntil
 	s.Crouch = not blocked and (UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.RightControl))
+	s.Sprint = not blocked and (UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.RightShift))
 	local delta = blocked and Vector2.zero or UserInputService:GetMouseDelta()
 	if s.M1 or s.M2 then
 		s.AimU += delta.X * A.ClientSensitivity
@@ -147,12 +150,12 @@ function InputController.Update(ctx, dt)
 	-- server authority: intent goes through InputActions every frame (predicted locally, replayed
 	-- on the server) instead of the RemoteEvent
 	if Runtime.ServerAuthority then
-		SimInput.Fire(ctx.Player, s.Move, ctx.Camera.Yaw, s.AimU, s.AimV, s.M1, s.M2, s.Kick, s.Crouch, s.Sheath, s.Bow, s.Incant)
+		SimInput.Fire(ctx.Player, s.Move, ctx.Camera.Yaw, s.AimU, s.AimV, s.M1, s.M2, s.Kick, s.Crouch, s.Sheath, s.Bow, s.Incant, s.Sprint)
 		return
 	end
 
 	-- a button press/release goes out immediately instead of waiting for the next send slot
-	local buttons = (s.M1 and 1 or 0) + (s.M2 and 2 or 0) + (s.Kick and 4 or 0) + (s.Crouch and 8 or 0) + (s.Sheath and 16 or 0) + (s.Bow and 32 or 0) + (s.Incant and 64 or 0)
+	local buttons = (s.M1 and 1 or 0) + (s.M2 and 2 or 0) + (s.Kick and 4 or 0) + (s.Crouch and 8 or 0) + (s.Sheath and 16 or 0) + (s.Bow and 32 or 0) + (s.Incant and 64 or 0) + (s.Sprint and 128 or 0)
 	if buttons ~= s.LastButtons or now - s.LastSend >= 1 / Config.Network.ClientSendRate then
 		s.LastButtons = buttons
 		s.LastSend = now

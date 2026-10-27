@@ -19,6 +19,7 @@ function Input.Neutral()
 		M2 = false,
 		Kick = false, -- C (teep); a tap is held for a few frames so it is never missed
 		Crouch = false, -- CTRL held
+		Sprint = false, -- SHIFT held (only with the sword sheathed, MotorController)
 		Sheath = false, -- 1 (draw / sheathe), a tap held a few frames like the kick
 		Bow = false, -- G (rei), a tap held like the kick
 		Incant = false, -- J (incantation), a tap held like the kick

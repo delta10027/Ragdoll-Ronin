@@ -391,13 +391,17 @@ do
 end
 
 -- An arm not holding anything hangs at the side; walking, it swings opposite to the leg on its
--- side (f.GaitArm, set by standLegs: + = forward), the elbow bending more as it comes forward
+-- side (f.GaitArm, set by standLegs: + = forward) almost straight, from the shoulder. Sprinting
+-- (f.GaitArm.Sprint, 0..1) the elbow bends to about a right angle and pumps with the swing.
 local function hangArms(pose, side, f)
 	local s = side == "Right" and 1 or -1
 	local ga = f and f.GaitArm
-	local swing, run = ga and ga[side] or 0, ga and ga.Run or 0
-	pose[side .. "Shoulder"] = CFrame.Angles(rad(8) + M.ArmSwing * swing, 0, s * rad(6 + 4 * run))
-	pose[side .. "Elbow"] = rad(20) + M.ArmRunElbow * run + M.ArmSwingElbow * math.max(0, swing)
+	local swing, sprint = ga and ga[side] or 0, ga and ga.Sprint or 0
+	local pitch = rad(6) + (M.ArmSwing + (M.SprintArmSwing - M.ArmSwing) * sprint) * swing
+	local out = rad(7) + (M.SprintArmOut - rad(7)) * sprint
+	pose[side .. "Shoulder"] = CFrame.Angles(pitch, 0, s * out)
+	local sprintElbow = M.SprintElbow + M.SprintElbowPump * swing
+	pose[side .. "Elbow"] = M.WalkArmElbow + (sprintElbow - M.WalkArmElbow) * sprint
 end
 
 -- thigh pitch (forward +) and knee bend that put the ankle `fwd` ahead of and `depth` below the hip
@@ -422,27 +426,36 @@ local function standLegs(f, dt, pose)
 	local pelvis = f.Parts.LowerTorso
 	local vel = f.CommandedVelocity or Vector3.zero
 	local speed = vel.Magnitude
-	local frac = math.clamp(speed / M.WalkSpeed, 0, 1)
+	local over = math.clamp(speed / M.WalkSpeed, 0, M.SprintSpeedMult) -- (past 1 only sprinting)
+	local frac = math.min(over, 1)
 	local g = f.Gait
 	-- stride (full cycle) ~ speed ^ 0.7: step length and cadence both grow with speed
-	local want = speed > 0.6 and M.StrideMax * frac ^ M.StrideExponent or 0
+	-- (sprinting, past walking speed the stride grows slowly and the cadence takes the rest)
+	local want = speed > 0.6
+			and M.StrideMax * (over <= 1 and over ^ M.StrideExponent or over ^ M.SprintStrideExponent)
+		or 0
 	g.Stride = (g.Stride or 0) + (want - (g.Stride or 0)) * math.min(1, M.GaitBlendRate * dt)
 	local stride = g.Stride
 	if speed > 0.6 then
 		g.Phase = (g.Phase + dt * speed / math.max(stride, M.StrideMax * 0.3) * TWO_PI) % TWO_PI
 	end
 	local amp = math.clamp(stride / M.StrideMax, 0, 1) -- how far into the walk the legs are
+	-- how far into a sprint: follows the (smoothed) stride, so walk and sprint blend into each other
+	local sprintStride = M.StrideMax * M.SprintSpeedMult ^ M.SprintStrideExponent
+	local sprint = Util.smoothstep(math.clamp((stride - M.StrideMax) / (sprintStride - M.StrideMax), 0, 1))
 	-- the faster the gait, the lower the body rides (more knee at mid stance), and a planted foot
 	-- may only travel as far as the leg reaches from that height: at speed the foot is down for a
 	-- shorter part of the cycle (a run's flight phase) instead of skating
-	local walkDepth = LEG_MAX * math.cos((M.StanceKneeBend + M.GaitKneeDip * amp) / 2)
+	local walkDepth = LEG_MAX * math.cos((M.StanceKneeBend + M.GaitKneeDip * amp + M.SprintKneeDip * sprint) / 2)
 	local reachX = math.sqrt(math.max(0, (LEG_MAX * M.GaitReach) ^ 2 - walkDepth * walkDepth))
 	local duty = M.DutyWalk + (M.DutyRun - M.DutyWalk) * frac
+	duty += (M.DutySprint - duty) * sprint
 	if stride > 1e-3 then
 		duty = math.min(duty, 2 * reachX / stride)
 	end
 	local X = duty * stride / 2 -- foot ahead of / behind the hip at the ends of the stance
 	local lift = (M.SwingLift + (M.SwingLiftRun - M.SwingLift) * frac * frac) * math.min(1, amp * 2)
+		+ M.SprintLiftExtra * sprint
 
 	local lv = pelvis.CFrame:VectorToObjectSpace(vel)
 	local m = Util.unit(Vector3.new(lv.X, 0, lv.Z), Vector3.new(0, 0, -1))
@@ -477,6 +490,23 @@ local function standLegs(f, dt, pose)
 			x = -X + 2 * X * (1 - math.cos(math.pi * w)) / 2
 			up = lift * math.sin(math.pi * math.min(1, w * 1.15)) -- (peak clearance a little early)
 			toe = -rad(22) * (1 - Util.smoothstep(w / 0.4)) + rad(12) * Util.smoothstep((w - 0.5) / 0.5)
+			if sprint > 0 then
+				-- sprinting: a full running loop instead of a low arc. The foot stays back while the
+				-- heel kicks up and further behind (toes pointed), the knee then drives it through
+				-- high, it reaches out past the landing point and paws back down onto it
+				local function s01(a)
+					return Util.smoothstep(math.clamp(a, 0, 1))
+				end
+				local sx = -X + 2 * X * s01((w - 0.15) / 0.85)
+					- M.SprintKickBack * math.sin(math.pi * math.clamp(w / 0.55, 0, 1))
+					+ M.SprintReachForward * math.sin(math.pi * math.clamp((w - 0.45) / 0.55, 0, 1))
+				local pk = M.SprintLiftPeak
+				local su = lift * math.sin(math.pi * 0.5 * (w < pk and w / pk or 1 + (w - pk) / (1 - pk)))
+				local st = -M.SprintToePoint * (1 - s01((w - 0.3) / 0.35)) + rad(12) * s01((w - 0.65) / 0.35)
+				x += (sx - x) * sprint
+				up += (su - up) * sprint
+				toe += (st - toe) * sprint
+			end
 		end
 		toe *= amp
 		-- standing still the feet rest in a slight fighting stagger (left ahead)
@@ -501,7 +531,7 @@ local function standLegs(f, dt, pose)
 		pose[side .. "Knee"] = knee
 		pose[side .. "Ankle"] = CFrame.Angles(knee - thigh + toe, 0, -splay - roll)
 	end
-	f.GaitArm = { Left = -footFwd.Left, Right = -footFwd.Right, Run = frac * frac * amp }
+	f.GaitArm = { Left = -footFwd.Left, Right = -footFwd.Right, Run = frac * frac * amp, Sprint = sprint }
 	f.GaitBob = (walkDepth - LEG_MAX * math.cos(M.StanceKneeBend / 2))
 		+ M.GaitBob * amp * (1 - frac) * math.cos(2 * TWO_PI * (((g.Phase / TWO_PI) % 1) - duty / 2))
 end
@@ -655,6 +685,11 @@ local function uprightPose(f, dt)
 	else
 		standLegs(f, dt, pose)
 	end
+	if f.GaitArm and f.GaitArm.Sprint > 0 then
+		-- sprinting: the body drives forward over the legs
+		pose.Waist = pose.Waist * CFrame.Angles(-M.SprintLean * f.GaitArm.Sprint, 0, 0)
+		pose.NeckHead = pose.NeckHead * CFrame.Angles(M.SprintLean * 0.5 * f.GaitArm.Sprint, 0, 0)
+	end
 	if f.GaitYaw then
 		-- the shoulders turn against the pelvis (with the arm swing; holding the sword they stay
 		-- square to the front) and the head keeps looking ahead
@@ -751,6 +786,14 @@ function MotorController.Apply(f, dt, inp)
 	local moveDir = StateDefs.Upright[st] and inp.Move or Vector3.zero
 	local speed = M.WalkSpeed * tone.Move * caps.Move * (caps.Kneeling and M.KneelSpeedMult or 1)
 		* (inp.Crouch and M.CrouchSpeedMult or 1)
+	-- SHIFT: sprint, sword sheathed, moving forward, plain walking states only
+	if inp.Sprint and (st == "Idle" or st == "Moving") and not inp.Crouch and not caps.Kneeling
+		and (not f.Sword or (f.Sheathed and not f.DrawPose)) and not f.BowT and not f.IncantT then
+		local ahead = moveDir:Dot(Vector3.new(-math.sin(f.FacingYaw), 0, -math.cos(f.FacingYaw)))
+		if ahead >= M.SprintMinAhead then
+			speed *= M.SprintSpeedMult
+		end
+	end
 	local vel = Wind.Resist(moveDir * speed) -- slower walking into a strong wind
 	if StateDefs.Upright[st] then
 		vel = Spacing.Adjust(f, vel)

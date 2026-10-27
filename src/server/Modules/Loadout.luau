@@ -4,6 +4,7 @@
 	  ("Armor", piece, wear: boolean)   put an armour piece on (restored to full) or take it off
 	  ("Incantation", name or "None")   the incantation J casts
 	  ("Wind", speed, yaw)              the server's wind (Config.Wind; anyone may change it)
+	  ("Rain", intensity 0..1)          the server's rain (Config.Rain; anyone may change it)
 	The choices are kept on the Player (attributes "Armor_<piece>", "IncantChoice") and applied
 	to every new fighter of theirs (Apply, at spawn). Putting armour on only works while standing
 	and out of combat (not hurt for Config.Armor.EquipCooldown seconds); taking it off always does.
@@ -64,6 +65,11 @@ local function onRequest(player, kind, a, b)
 		end
 		workspace:SetAttribute("WindSpeed", math.clamp(math.round(a), 0, Config.Wind.MaxSpeed))
 		workspace:SetAttribute("WindYaw", math.round(b) % 360)
+	elseif kind == "Rain" then
+		if typeof(a) ~= "number" or a ~= a then
+			return
+		end
+		workspace:SetAttribute("RainIntensity", math.clamp(math.round(a * 100) / 100, 0, 1))
 	elseif kind == "Incantation" then
 		if a ~= "None" and (typeof(a) ~= "string" or not Config.Incantations[a] or a == "Order") then
 			return
@@ -93,6 +99,7 @@ end
 function Loadout.Init()
 	workspace:SetAttribute("WindSpeed", Config.Wind.Speed)
 	workspace:SetAttribute("WindYaw", Config.Wind.Yaw)
+	workspace:SetAttribute("RainIntensity", Config.Rain.Intensity)
 	ReplicatedStorage.RagdollRonin.Remotes.Loadout.OnServerEvent:Connect(onRequest)
 	game:GetService("Players").PlayerRemoving:Connect(function(p)
 		last[p] = nil

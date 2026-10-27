@@ -4,6 +4,7 @@
 	               piece has left, or that it is broken. Armour only goes on out of combat.
 	  Incantation  the one J casts (None, Fire)
 	  Wind         the server's wind (Config.Wind): speed - / +, and turn its direction left / right
+	  Rain         the server's rain (Config.Rain): intensity - / +
 	While the menu is open the mouse is free and the fighter takes no input (ctx.MenuOpen).
 	Also sends "Incantation : <name>" to the chat when one of yours takes hold (the model's
 	"IncantActive" attribute, set by the server when the rub is complete).
@@ -17,6 +18,7 @@ local LoadoutMenu = {}
 local AR = Config.Armor
 local IC = Config.Incantations
 local W = Config.Wind
+local R = Config.Rain
 local COMPASS = { "N", "NW", "W", "SW", "S", "SE", "E", "NE" } -- yaw 0 blows toward -Z (N), 90 toward -X
 local BG = Color3.fromRGB(22, 20, 24)
 local ROW = Color3.fromRGB(44, 40, 46)
@@ -101,6 +103,20 @@ local function refreshWind()
 		or speed >= W.CalmSpeed and "breeze" or "calm"
 	ui.WindSpeed.Text = string.format("Speed  %d  (%s)", speed, feel)
 	ui.WindYaw.Text = string.format("Blowing toward  %s  (%d°)", COMPASS[math.round((yaw % 360) / 45) % 8 + 1], yaw % 360)
+end
+
+local function rainNow()
+	local r = workspace:GetAttribute("RainIntensity")
+	return typeof(r) == "number" and r or R.Intensity
+end
+
+local function refreshRain()
+	if not ui.Rain then
+		return
+	end
+	local r = rainNow()
+	local feel = r <= 0 and "off" or r <= 0.25 and "drizzle" or r <= 0.5 and "rain" or r <= 0.75 and "heavy" or "downpour"
+	ui.Rain.Text = string.format("Rain  %d%%  (%s)", math.round(r * 100), feel)
 end
 
 local function refresh(ctx)
@@ -247,6 +263,15 @@ function LoadoutMenu.Init(ctx)
 	refreshWind()
 	workspace:GetAttributeChangedSignal("WindSpeed"):Connect(refreshWind)
 	workspace:GetAttributeChangedSignal("WindYaw"):Connect(refreshWind)
+
+	add(label(panel, "Rain - for everyone on the server", 16, true))
+	local rainRow, rainText = stepper(panel, "-", "+", function(dir)
+		remote:FireServer("Rain", math.clamp(rainNow() + dir * R.Step, 0, 1))
+	end)
+	add(rainRow)
+	ui.Rain = rainText
+	refreshRain()
+	workspace:GetAttributeChangedSignal("RainIntensity"):Connect(refreshRain)
 
 	ui.Status = add(label(panel, "", 13, false))
 	ui.Status.TextColor3 = Color3.fromRGB(255, 120, 100)
