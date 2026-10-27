@@ -188,6 +188,7 @@ local MESSAGES = {
 	ArmorBroken = { "YOUR ARMOUR BROKE", COLORS.Swing },
 	Ignited = { "SET ALIGHT", Color3.fromRGB(255, 140, 40) },
 	Burning = { "BURNING", Color3.fromRGB(255, 110, 30) },
+	ShroudedEnemy = { "SHROUDED", Color3.fromRGB(170, 120, 240) },
 }
 
 function CombatCursorUI.Flash(ctx, kind, info)
@@ -206,6 +207,24 @@ function CombatCursorUI.Flash(ctx, kind, info)
 		if ctx.LoadoutRefused then
 			ctx.LoadoutRefused(info.Reason)
 		end
+	elseif kind == "Shrouded" then
+		-- a shadowed blade's wound: the sight darkens and drains of colour, then clears
+		text, color = "SHROUDED", Color3.fromRGB(170, 120, 240)
+		local Lighting = game:GetService("Lighting")
+		local TweenService = game:GetService("TweenService")
+		local cc = Lighting:FindFirstChild("RR_Shroud")
+		if not cc then
+			cc = Instance.new("ColorCorrectionEffect")
+			cc.Name = "RR_Shroud"
+			cc.Parent = Lighting
+		end
+		local darken = tonumber(info.Darken) or 0.35
+		local time = tonumber(info.Time) or 4
+		cc.Brightness, cc.Saturation, cc.Contrast = -darken, -0.7, 0.15
+		cc.TintColor = Color3.fromRGB(200, 185, 230)
+		local fade = TweenService:Create(cc, TweenInfo.new(time, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+			{ Brightness = 0, Saturation = 0, Contrast = 0, TintColor = Color3.new(1, 1, 1) })
+		fade:Play()
 	elseif kind == "Died" then
 		ui.DeathBase = "YOU DIED - " .. tostring(info.Reason)
 		ui.Death.Text = ui.DeathBase

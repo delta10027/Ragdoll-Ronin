@@ -400,18 +400,23 @@ Config.Bow = {
 -- Equipping armour only works out of combat (not hit for EquipCooldown seconds) and restores it.
 -- Cosmetic pieces cover no segments: they never stop a blow, never break, and go on any time.
 -- View: how the client draws it (ArmorView: "Shell" plates over the segments, "Helmet" a kabuto
--- over the crown; CloakView: "Cloak", "Cape", "Scarf"; GearView: "Kasa", "Satchel", "Pack",
--- "Waraji"). The keys are the item keys of Config.Items.
+-- over the crown; CloakView: "Cloak", "Cape", "Scarf", "Haori"; GearView: "Kasa", "Satchel",
+-- "Pack", "Waraji"). Colors: a cloth piece's Main, Trim and Accent colours (else just Color).
+-- The keys are the item keys of Config.Items.
 Config.Armor = {
 	PowerThrough = 0.2,
 	EquipCooldown = 8,
-	Order = { "Kabuto", "Kasa", "Cloak", "Cape", "Scarf", "Satchel", "TravelPack", "Suneate", "Kogake", "Waraji" },
+	Order = { "Kabuto", "Kasa", "Cloak", "Cape", "Scarf", "Haori", "Satchel", "TravelPack", "Suneate", "Kogake", "Waraji" },
 	Pieces = {
 		Kabuto = { Label = "Kabuto", Hits = 3, Segments = { "Head" }, Color = Color3.fromRGB(30, 28, 30), View = "Helmet" },
 		Kasa = { Label = "Kasa", Cosmetic = true, Hits = 1, Segments = {}, Color = Color3.fromRGB(196, 164, 104), View = "Kasa" },
 		Cloak = { Label = "Cloak", Cosmetic = true, Hits = 1, Segments = {}, Color = Color3.fromRGB(78, 20, 26), View = "Cloak" },
 		Cape = { Label = "Travelling Cape", Cosmetic = true, Hits = 1, Segments = {}, Color = Color3.fromRGB(36, 40, 52), View = "Cape" },
 		Scarf = { Label = "Scarf", Cosmetic = true, Hits = 1, Segments = {}, Color = Color3.fromRGB(176, 44, 40), View = "Scarf" },
+		Haori = {
+			Label = "Haori", Cosmetic = true, Hits = 1, Segments = {}, Color = Color3.fromRGB(22, 20, 24), View = "Haori",
+			Colors = { Main = Color3.fromRGB(22, 20, 24), Trim = Color3.fromRGB(236, 232, 224), Accent = Color3.fromRGB(170, 28, 32) },
+		},
 		Satchel = { Label = "Satchel", Cosmetic = true, Hits = 1, Segments = {}, Color = Color3.fromRGB(112, 76, 48), View = "Satchel" },
 		TravelPack = { Label = "Travel Pack", Cosmetic = true, Hits = 1, Segments = {}, Color = Color3.fromRGB(88, 70, 50), View = "Pack" },
 		Suneate = { Label = "Suneate", Hits = 4, Segments = { "LeftThigh", "LeftShin", "RightThigh", "RightShin" }, Color = Color3.fromRGB(38, 36, 40), View = "Shell" },
@@ -428,8 +433,8 @@ Config.Armor = {
 Config.Inventory = {
 	Capacity = 16, -- grid cells without a bag
 	Slots = { "Head", "Neck", "Back", "Legs", "Boots" },
-	SlotHints = { Head = "Helmets, hats", Neck = "Scarves, cloaks, capes", Back = "Bags", Legs = "Leg armour", Boots = "Boots" },
-	Starter = { "Kabuto", "Cloak", "Suneate", "BookFire" }, -- what a player joins with
+	SlotHints = { Head = "Helmets, hats", Neck = "Scarves, cloaks, capes, haori", Back = "Bags", Legs = "Leg armour", Boots = "Boots" },
+	Starter = { "Kabuto", "Cloak", "Haori", "Suneate", "BookFire", "BookShadow" }, -- what a player joins with (the first book goes on the sword)
 	Creative = true, -- the creative menu (M) may give items (false: nobody can)
 }
 
@@ -437,18 +442,20 @@ Config.Inventory = {
 -- (its look and armour are Config.Armor.Pieces[key]); "Book" carries an incantation
 -- (Config.Incantations) and is set on the sword. Capacity: extra grid cells a bag gives.
 Config.Items = {
-	Order = { "Kabuto", "Kasa", "Cloak", "Cape", "Scarf", "Satchel", "TravelPack", "Suneate", "Kogake", "Waraji", "BookFire" },
+	Order = { "Kabuto", "Kasa", "Cloak", "Cape", "Scarf", "Haori", "Satchel", "TravelPack", "Suneate", "Kogake", "Waraji", "BookFire", "BookShadow" },
 	Kabuto = { Kind = "Wear", Slot = "Head", Description = "A lacquered war helmet. Turns aside blows to the head." },
 	Kasa = { Kind = "Wear", Slot = "Head", Description = "A wide straw hat against sun and rain." },
 	Cloak = { Kind = "Wear", Slot = "Neck", Description = "A heavy cloak with a mantle over the shoulders. Flows in the wind." },
 	Cape = { Kind = "Wear", Slot = "Neck", Description = "A long, light cape for the road." },
 	Scarf = { Kind = "Wear", Slot = "Neck", Description = "A scarf wound about the neck, its ends trailing behind." },
+	Haori = { Kind = "Wear", Slot = "Neck", Description = "A black jacket worn open over the shoulders, white at the collar, red at the hem and cuffs. Its wide sleeves swing with the arms." },
 	Satchel = { Kind = "Wear", Slot = "Back", Capacity = 6, Description = "A small leather bag on a strap." },
 	TravelPack = { Kind = "Wear", Slot = "Back", Capacity = 12, Description = "A framed pack with a rolled blanket on top." },
 	Suneate = { Kind = "Wear", Slot = "Legs", Description = "Plated guards over the thighs and shins." },
 	Kogake = { Kind = "Wear", Slot = "Boots", Description = "Armoured foot covers." },
 	Waraji = { Kind = "Wear", Slot = "Boots", Description = "Woven straw sandals, tied at the ankle." },
-	BookFire = { Kind = "Book", Label = "Book of Fire", Incantation = "Fire", Color = Color3.fromRGB(176, 52, 28), Description = "Set on the sword, its incantation makes the blade burn." },
+	BookFire = { Kind = "Book", Label = "Book of Fire", Incantation = "Fire", Color = Color3.fromRGB(176, 52, 28), Gem = Color3.fromRGB(255, 150, 60), Glow = Color3.fromRGB(255, 120, 40), Description = "Set on the sword, its incantation makes the blade burn." },
+	BookShadow = { Kind = "Book", Label = "Book of Shadow", Incantation = "Shadow", Color = Color3.fromRGB(34, 26, 42), Gem = Color3.fromRGB(150, 90, 230), Glow = Color3.fromRGB(90, 50, 140), Description = "Set on the sword, its incantation sinks the blade into shadow: hard to see coming, and its wounds cloud the eyes." },
 }
 for _, key in ipairs(Config.Items.Order) do
 	local item = Config.Items[key]
@@ -545,12 +552,39 @@ Config.Cloak = {
 		Cloak = { Collar = 0.7, Mantle = 0.18, Clasp = true, Cols = 4, Rows = 8, Length = 3.3 * S, TopWidth = 1.7 * S, BottomWidth = 2.3 * S },
 		Cape = { Collar = 0, Mantle = 0.07, Clasp = true, Cols = 4, Rows = 9, Length = 3.8 * S, TopWidth = 1.8 * S, BottomWidth = 2.0 * S },
 		Scarf = { Collar = 1.0, Mantle = 0, Clasp = false, Cols = 2, Rows = 6, Length = 1.7 * S, TopWidth = 0.3 * S, BottomWidth = 0.26 * S, Strips = { -0.13 * S, 0.16 * S } },
+		-- the haori: the back and two open fronts from the shoulders to mid-thigh, and a wide sleeve
+		-- hanging around each upper arm. Pins: { part, point in units of its half size }; the
+		-- fronts' inner column is the white lapel, the last row of each sheet the red hem / cuff.
+		Haori = {
+			Collar = 0.45, CollarColor = "Trim", Mantle = 0, Clasp = false, Himo = true,
+			Sheets = {
+				{ Rows = 8, Length = 2.6 * S, Flare = 1.12, Hem = "Accent", Pins = {
+					{ "UpperTorso", Vector3.new(-1.08, 0.97, 1.25) }, { "UpperTorso", Vector3.new(-0.54, 0.97, 1.25) },
+					{ "UpperTorso", Vector3.new(0, 0.97, 1.25) }, { "UpperTorso", Vector3.new(0.54, 0.97, 1.25) },
+					{ "UpperTorso", Vector3.new(1.08, 0.97, 1.25) } } },
+				{ Rows = 8, Length = 2.6 * S, Trim = 1, Hem = "Accent", Pins = {
+					{ "UpperTorso", Vector3.new(-0.2, 0.97, -1.25) }, { "UpperTorso", Vector3.new(-0.45, 0.97, -1.25) },
+					{ "UpperTorso", Vector3.new(-0.78, 0.97, -1.25) }, { "UpperTorso", Vector3.new(-1.08, 0.97, -1.25) } } },
+				{ Rows = 8, Length = 2.6 * S, Trim = 1, Hem = "Accent", Pins = {
+					{ "UpperTorso", Vector3.new(0.2, 0.97, -1.25) }, { "UpperTorso", Vector3.new(0.45, 0.97, -1.25) },
+					{ "UpperTorso", Vector3.new(0.78, 0.97, -1.25) }, { "UpperTorso", Vector3.new(1.08, 0.97, -1.25) } } },
+				{ Rows = 6, Length = 1.75 * S, Flare = 1.2, Hem = "Accent", Colliders = "LeftArm", Pins = {
+					{ "LeftUpperArmP", Vector3.new(0, 0.8, -1.7) }, { "LeftUpperArmP", Vector3.new(-1.2, 0.8, -1.2) },
+					{ "LeftUpperArmP", Vector3.new(-1.7, 0.8, 0) }, { "LeftUpperArmP", Vector3.new(-1.2, 0.8, 1.2) },
+					{ "LeftUpperArmP", Vector3.new(0, 0.8, 1.7) } } },
+				{ Rows = 6, Length = 1.75 * S, Flare = 1.2, Hem = "Accent", Colliders = "RightArm", Pins = {
+					{ "RightUpperArmP", Vector3.new(0, 0.8, -1.7) }, { "RightUpperArmP", Vector3.new(1.2, 0.8, -1.2) },
+					{ "RightUpperArmP", Vector3.new(1.7, 0.8, 0) }, { "RightUpperArmP", Vector3.new(1.2, 0.8, 1.2) },
+					{ "RightUpperArmP", Vector3.new(0, 0.8, 1.7) } } },
+			},
+		},
 	},
 }
 
 -- Incantations (J, from the book set on the sword: TAB > Weapon): the fighter holds the sword level across the
 -- chest and runs the free hand along the flat from the guard to the tip (Shared.Sim.Incant);
 -- the blade then takes the incantation for Duration seconds ("Incantation : Fire" in chat).
+-- Fire burns; Shadow hides the blade and shrouds what it wounds (Config.Incantations).
 Config.Incant = {
 	RaiseTime = 0.4, -- the blade comes level across the chest, the left hand to the guard
 	RubTime = 1.0, -- the hand runs along the flat to the tip
@@ -562,7 +596,7 @@ Config.Incant = {
 	HandAbove = 0.2, -- the palm rides this far above the blade's centre line (scaled)
 }
 Config.Incantations = {
-	Order = { "Fire" },
+	Order = { "Fire", "Shadow" },
 	Fire = {
 		Label = "Fire",
 		Duration = 25, -- seconds the blade burns
@@ -571,6 +605,21 @@ Config.Incantations = {
 		BurnTime = 3, -- a body part it wounds burns this long...
 		BurnIntegrityPerSecond = 6, -- ...losing this much integrity per second (of 100)
 		BurnBalancePerSecond = 4,
+	},
+	-- the blade's metal sinks into shadow (nearly invisible, trailing black smoke), so its swings
+	-- are hard to read; a body part it wounds is shrouded for ShroudTime seconds: smoke clings to
+	-- it, the wound bleeds ShroudBleed ml/s more, the fighter loses balance and their sight darkens
+	Shadow = {
+		Label = "Shadow",
+		Duration = 20,
+		Cooldown = 35,
+		PowerMult = 1,
+		BladeTransparency = 0.82, -- the blade, edge and tip (the hilt stays as it is)
+		BladeColor = Color3.fromRGB(14, 10, 18),
+		ShroudTime = 4,
+		ShroudBleed = 6,
+		ShroudBalancePerSecond = 5,
+		ShroudDarken = 0.35, -- how far the shrouded fighter's sight darkens (ColorCorrection brightness)
 	},
 }
 
@@ -594,6 +643,7 @@ Config.Sounds = {
 	ArmorBreak = { Ids = {}, Volume = 1, PitchMin = 0.9, PitchMax = 1.0, Fallback = "Clash" }, -- an armour piece breaks
 	Incantation = { Ids = {}, Volume = 0.9, PitchMin = 1, PitchMax = 1 }, -- an incantation takes hold of the blade
 	FireHit = { Ids = {}, Volume = 0.8, PitchMin = 0.9, PitchMax = 1.1 }, -- a burning blade sets a body part alight
+	ShadowHit = { Ids = {}, Volume = 0.8, PitchMin = 0.85, PitchMax = 1.0 }, -- a shadowed blade shrouds a body part
 	RollOffMaxDistance = 120,
 	SlashCooldown = 0.2, -- per fighter: fast back-and-forth strokes do not stack whooshes
 	HitSoundCooldown = 0.4, -- per attacker: one cut sound for a blade passing through several body parts

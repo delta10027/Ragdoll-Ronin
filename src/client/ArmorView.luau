@@ -1,7 +1,7 @@
 --[[
 	ArmorView: draws every fighter's armour (server Armor: model attributes "Armor_<piece>" = hits
 	left) as local shells welded over the covered body parts. When a piece breaks (hits reach 0)
-	its shells come off and tumble away. Cloth (Cloak, Cape, Scarf) is built by CloakView, the
+	its shells come off and tumble away. Cloth (Cloak, Cape, Scarf, Haori) is built by CloakView, the
 	rest of the clothing (hat, bags, sandals) by GearView, by the piece's View. Local parts only:
 	nothing replicates, the bodies' physics and network ownership are untouched.
 	BuildPiece also dresses the inventory's figure and draws the item icons (ItemArt).
@@ -93,8 +93,8 @@ function ArmorView.BuildPiece(model, piece, into, opts)
 		return {}
 	end
 	local list = {}
-	if def.View == "Cloak" or def.View == "Cape" or def.View == "Scarf" then
-		list = CloakView.Build(model, def.View, def.Color, into, opts)
+	if Config.Cloak.Styles[def.View] then
+		list = CloakView.Build(model, def.View, def.Colors or { Main = def.Color }, into, opts)
 	elseif GearView.Has(def.View) then
 		local colliders
 		list, colliders = GearView.Build(def.View, model, def.Color, into)
