@@ -1,6 +1,6 @@
 --[[
 	CharacterPanel: the inventory (TAB > Character). On the left the grid of carried items
-	(InventoryGrid), on the right the fighter's figure wearing what is equipped, with the five
+	(InventoryGrid), on the right the fighter's figure wearing what is equipped, with the seven
 	equipment slots around it (Config.Inventory.Slots).
 	  drag an item onto its slot (or onto the figure)   wear it (it swaps with the slot's item)
 	  drag a slot's item onto the grid                  take it off
@@ -31,9 +31,11 @@ local SLOT = 72
 -- slot positions in the right half (x, y of the cell's top left), around the figure
 local LAYOUT = {
 	Head = Vector2.new(0, 34),
-	Back = Vector2.new(0, 176),
-	Legs = Vector2.new(0, 318),
+	Chest = Vector2.new(0, 132),
+	Sleeve = Vector2.new(0, 230),
+	Legs = Vector2.new(0, 328),
 	Neck = Vector2.new(1, 80),
+	Back = Vector2.new(1, 223),
 	Boots = Vector2.new(1, 366),
 }
 local FIGURE_CENTER = Vector3.new(0, -0.1, 0)

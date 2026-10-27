@@ -1,7 +1,7 @@
 --[[
 	ArmorView: draws every fighter's armour (server Armor: model attributes "Armor_<piece>" = hits
 	left) as local shells welded over the covered body parts. When a piece breaks (hits reach 0)
-	its shells come off and tumble away. Cloth (Cloak, Cape, Scarf, Haori) is built by CloakView, the
+	its shells come off and tumble away (a Do's with its lacing). Cloth (Cloak, Cape, Scarf, Haori) is built by CloakView, the
 	rest of the clothing (hat, bags, sandals) by GearView, by the piece's View. Local parts only:
 	nothing replicates, the bodies' physics and network ownership are untouched.
 	BuildPiece also dresses the inventory's figure and draws the item icons (ItemArt).
@@ -24,7 +24,10 @@ local function shellFor(part, piece, def, folder)
 	s.Name = "Armor_" .. piece
 	local size = part.Size + Vector3.one * (2 * AR.Inflate)
 	local cf = part.CFrame
-	if def.View == "Helmet" then
+	if def.View == "Do" then
+		-- a closer fit, so a haori goes on over it
+		size = part.Size + Vector3.one * (2 * AR.Inflate * 0.7)
+	elseif def.View == "Helmet" then
 		-- a kabuto over the top of the head, the face left open
 		size = Vector3.new(size.X, part.Size.Y * 0.55, size.Z)
 		cf = cf * CFrame.new(0, part.Size.Y * 0.3, 0)
@@ -42,6 +45,27 @@ local function shellFor(part, piece, def, folder)
 	w.Parent = s
 	s.Parent = folder
 	return s
+end
+
+-- a Do's lames: bands of lacing around each torso shell
+local LAMES = { UpperTorso = { -0.62, -0.22, 0.18 }, LowerTorso = { -0.45, 0.15 } }
+local function lacing(shell, partName, def, folder, list)
+	for _, y in ipairs(LAMES[partName] or {}) do
+		local band = Instance.new("Part")
+		band.Name = shell.Name .. "_Lacing"
+		band.Size = Vector3.new(shell.Size.X + 0.016, shell.Size.Y * 0.05, shell.Size.Z + 0.016)
+		band.CFrame = shell.CFrame * CFrame.new(0, shell.Size.Y * 0.5 * y, 0)
+		band.Color = def.Lacing or def.Color
+		band.Material = Enum.Material.Fabric
+		band.Massless = true
+		band.CanCollide, band.CanQuery, band.CanTouch, band.CastShadow = false, false, false, false
+		local w = Instance.new("WeldConstraint")
+		w.Part0 = shell
+		w.Part1 = band
+		w.Parent = band
+		band.Parent = folder
+		table.insert(list, band)
+	end
 end
 
 local function clear(model, piece, shatter)
@@ -106,7 +130,11 @@ function ArmorView.BuildPiece(model, piece, into, opts)
 		for _, name in ipairs(Anatomy.SegmentParts[seg] or {}) do
 			local part = model:FindFirstChild(name)
 			if part and part:IsA("BasePart") then
-				table.insert(list, shellFor(part, piece, def, into))
+				local shell = shellFor(part, piece, def, into)
+				table.insert(list, shell)
+				if def.View == "Do" then
+					lacing(shell, name, def, into, list)
+				end
 			end
 		end
 	end
