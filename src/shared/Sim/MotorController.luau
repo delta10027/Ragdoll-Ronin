@@ -658,7 +658,7 @@ local function uprightPose(f, dt)
 	if f.GaitYaw then
 		-- the shoulders turn against the pelvis (with the arm swing; holding the sword they stay
 		-- square to the front) and the head keeps looking ahead
-		local free = (not f.Sword or (f.Sheathed and not f.DrawPose)) and 1 or 0
+		local free = (not f.Sword or (f.Sheathed and not f.DrawPose)) and 1 - cover or 0 -- (an arm over the face stays put)
 		local shoulders = -f.GaitYaw * (M.GaitShoulderYaw / M.GaitPelvisYaw) * free
 		pose.Waist = CFrame.Angles(0, shoulders - f.GaitYaw, 0) * pose.Waist
 		pose.NeckBase = CFrame.Angles(0, -shoulders, 0) * pose.NeckBase
@@ -692,8 +692,9 @@ local function uprightPose(f, dt)
 		end
 	end
 	if cover > 0 then
-		-- the left forearm comes up across the face, blended from the walking arm swing
-		hangArms(pose, "Left", f)
+		-- the left forearm comes up across the face. It overrides the walk's arm swing: the blend
+		-- (only while starting to walk or turning into the wind) is from the arm hanging still
+		hangArms(pose, "Left")
 		pose.LeftShoulder = pose.LeftShoulder:Lerp(COVER_SHOULDER, cover)
 		pose.LeftElbow += (COVER_ELBOW - pose.LeftElbow) * cover
 	end

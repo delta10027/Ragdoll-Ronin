@@ -47,16 +47,17 @@ function Wind.Resist(vel)
 end
 
 -- 0..1: how far a fighter walking with velocity `vel` and facing `facing` (unit, horizontal)
--- shields the face. Strong wind, actually walking, and not with the wind at the back.
+-- shields the face. Any wind above HighSpeed covers fully (it doesn't scale with the wind, so the
+-- pose never sits halfway with the walk's arm swing showing through); it only ramps in as the
+-- fighter starts walking and turns from the wind at the back to into it.
 function Wind.Cover(vel, facing)
-	local strength = Wind.Strength()
-	if strength <= 0 or not vel then
+	if not vel or Wind.Strength() <= 0 then
 		return 0
 	end
 	local walking = math.clamp(vel.Magnitude / (0.3 * Config.Movement.WalkSpeed), 0, 1)
 	local dir = Wind.Get()
-	local headOn = math.clamp((0.6 - facing:Dot(dir)) / 0.6, 0, 1) -- 1 into or across it, 0 back to it
-	return strength * walking * headOn
+	local headOn = math.clamp((0.6 - facing:Dot(dir)) / 0.3, 0, 1) -- 1 into or across it, 0 back to it
+	return walking * headOn
 end
 
 return Wind

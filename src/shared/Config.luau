@@ -395,15 +395,15 @@ Config.Armor = {
 -- studs/s. Kept on the workspace (attributes "WindSpeed", "WindYaw") so every client sees it;
 -- anyone can change it from the loadout menu (M). It drives the faint wave streaks drawn around
 -- the camera (client WindView), the Cloak's cape, and, once strong, the fighters themselves:
--- walking into it is slower, and a fighter with the sword sheathed walking into it raises the
--- left forearm across the face and leans in.
+-- walking into it is slower, and from HighSpeed a fighter with the sword sheathed walking into it
+-- raises the left forearm across the face and leans in (instead of swinging that arm).
 Config.Wind = {
 	Speed = 8, -- at server start
 	Yaw = 45, -- degrees: 0 blows toward -Z (the spawn's forward), 90 toward -X
 	MaxSpeed = 60,
 	SpeedStep = 5, -- menu - / +
 	YawStep = 45, -- menu turn left / right
-	HighSpeed = 25, -- from here the fighters feel it...
+	HighSpeed = 25, -- above this the fighters feel it (and cover their faces)...
 	FullSpeed = 50, -- ...fully from here
 	IntoSlow = 0.45, -- walking straight into full wind loses this fraction of the walk speed
 	-- covering the face: the left elbow comes forward in front of the chest and the forearm runs up
