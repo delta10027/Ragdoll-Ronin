@@ -63,6 +63,17 @@
         "Technology": "Voxel"
       }
     },
+    "TextChatService": {
+      "$properties": {
+        "ChatVersion": "TextChatService"
+      },
+      "BubbleChatConfiguration": {
+        "$className": "BubbleChatConfiguration",
+        "$properties": {
+          "Enabled": true
+        }
+      }
+    },
     "SoundService": {
       "$properties": {
         "RespectFilteringEnabled": true
