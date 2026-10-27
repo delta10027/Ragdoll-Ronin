@@ -396,17 +396,19 @@ Config.Bow = {
 -- (TAB > Character, Config.Inventory). Armour pieces cover body segments: a damaging hit on a
 -- covered segment is stopped (the blade bounces off: only PowerThrough of it reaches the body, as
 -- a blunt blow) and costs the piece one of its Hits; at 0 the piece breaks off and the body under
--- it is exposed. Neck, torso, arms and hands are never covered: the gaps to aim for.
+-- it is exposed. The neck and hands are never covered: the gaps to aim for (and the torso and
+-- arms of a fighter without a Do or Kote).
 -- Equipping armour only works out of combat (not hit for EquipCooldown seconds) and restores it.
 -- Cosmetic pieces cover no segments: they never stop a blow, never break, and go on any time.
 -- View: how the client draws it (ArmorView: "Shell" plates over the segments, "Helmet" a kabuto
--- over the crown; CloakView: "Cloak", "Cape", "Scarf", "Haori"; GearView: "Kasa", "Satchel",
--- "Pack", "Waraji"). Colors: a cloth piece's Main, Trim and Accent colours (else just Color).
+-- over the crown, "Do" a cuirass of laced lames over the torso; CloakView: "Cloak", "Cape", "Scarf", "Haori"; GearView: "Kasa", "Satchel",
+-- "Pack", "Waraji"). Colors: a cloth piece's Main, Trim and Accent colours (else just Color);
+-- Lacing: the cords of a Do.
 -- The keys are the item keys of Config.Items.
 Config.Armor = {
 	PowerThrough = 0.2,
 	EquipCooldown = 8,
-	Order = { "Kabuto", "Kasa", "Cloak", "Cape", "Scarf", "Haori", "Satchel", "TravelPack", "Suneate", "Kogake", "Waraji" },
+	Order = { "Kabuto", "Kasa", "Cloak", "Cape", "Scarf", "Haori", "Do", "Kote", "Satchel", "TravelPack", "Suneate", "Kogake", "Waraji" },
 	Pieces = {
 		Kabuto = { Label = "Kabuto", Hits = 3, Segments = { "Head" }, Color = Color3.fromRGB(30, 28, 30), View = "Helmet" },
 		Kasa = { Label = "Kasa", Cosmetic = true, Hits = 1, Segments = {}, Color = Color3.fromRGB(196, 164, 104), View = "Kasa" },
@@ -417,6 +419,11 @@ Config.Armor = {
 			Label = "Haori", Cosmetic = true, Hits = 1, Segments = {}, Color = Color3.fromRGB(22, 20, 24), View = "Haori",
 			Colors = { Main = Color3.fromRGB(22, 20, 24), Trim = Color3.fromRGB(236, 232, 224), Accent = Color3.fromRGB(170, 28, 32) },
 		},
+		Do = {
+			Label = "Do", Hits = 5, Segments = { "UpperTorso", "LowerTorso" }, Color = Color3.fromRGB(34, 30, 32), View = "Do",
+			Lacing = Color3.fromRGB(150, 30, 34),
+		},
+		Kote = { Label = "Kote", Hits = 3, Segments = { "LeftUpperArm", "LeftForearm", "RightUpperArm", "RightForearm" }, Color = Color3.fromRGB(40, 38, 44), View = "Shell" },
 		Satchel = { Label = "Satchel", Cosmetic = true, Hits = 1, Segments = {}, Color = Color3.fromRGB(112, 76, 48), View = "Satchel" },
 		TravelPack = { Label = "Travel Pack", Cosmetic = true, Hits = 1, Segments = {}, Color = Color3.fromRGB(88, 70, 50), View = "Pack" },
 		Suneate = { Label = "Suneate", Hits = 4, Segments = { "LeftThigh", "LeftShin", "RightThigh", "RightShin" }, Color = Color3.fromRGB(38, 36, 40), View = "Shell" },
@@ -426,14 +433,17 @@ Config.Armor = {
 	Inflate = 0.07 * S, -- shell thickness over each body part
 }
 
--- The inventory (TAB > Character): a grid of the items a player carries and five equipment slots.
+-- The inventory (TAB > Character): a grid of the items a player carries and seven equipment slots.
 -- Kept by the server (Loadout) for the session and mirrored to the owner as the StringValue
 -- "RR_Inventory" (JSON) under the Player. A bag in the Back slot adds its Capacity to the grid. The incantation
 -- book set on the sword (TAB > Weapon) is the one J casts.
 Config.Inventory = {
 	Capacity = 16, -- grid cells without a bag
-	Slots = { "Head", "Neck", "Back", "Legs", "Boots" },
-	SlotHints = { Head = "Helmets, hats", Neck = "Scarves, cloaks, capes, haori", Back = "Bags", Legs = "Leg armour", Boots = "Boots" },
+	Slots = { "Head", "Neck", "Chest", "Sleeve", "Back", "Legs", "Boots" },
+	SlotHints = {
+		Head = "Helmets, hats", Neck = "Scarves, cloaks, capes, haori", Chest = "Chest armour", Sleeve = "Arm armour",
+		Back = "Bags", Legs = "Leg armour", Boots = "Boots",
+	},
 	Starter = { "Kabuto", "Cloak", "Haori", "Suneate", "BookFire", "BookShadow" }, -- what a player joins with (the first book goes on the sword)
 	Creative = true, -- the creative menu (M) may give items (false: nobody can)
 }
@@ -442,13 +452,15 @@ Config.Inventory = {
 -- (its look and armour are Config.Armor.Pieces[key]); "Book" carries an incantation
 -- (Config.Incantations) and is set on the sword. Capacity: extra grid cells a bag gives.
 Config.Items = {
-	Order = { "Kabuto", "Kasa", "Cloak", "Cape", "Scarf", "Haori", "Satchel", "TravelPack", "Suneate", "Kogake", "Waraji", "BookFire", "BookShadow" },
+	Order = { "Kabuto", "Kasa", "Cloak", "Cape", "Scarf", "Haori", "Do", "Kote", "Satchel", "TravelPack", "Suneate", "Kogake", "Waraji", "BookFire", "BookShadow" },
 	Kabuto = { Kind = "Wear", Slot = "Head", Description = "A lacquered war helmet. Turns aside blows to the head." },
 	Kasa = { Kind = "Wear", Slot = "Head", Description = "A wide straw hat against sun and rain." },
 	Cloak = { Kind = "Wear", Slot = "Neck", Description = "A heavy cloak with a mantle over the shoulders. Flows in the wind." },
 	Cape = { Kind = "Wear", Slot = "Neck", Description = "A long, light cape for the road." },
 	Scarf = { Kind = "Wear", Slot = "Neck", Description = "A scarf wound about the neck, its ends trailing behind." },
 	Haori = { Kind = "Wear", Slot = "Neck", Description = "A black jacket worn open over the shoulders, white at the collar, red at the hem and cuffs. Its skirt and wide sleeves swing with the body." },
+	Do = { Kind = "Wear", Slot = "Chest", Description = "A lacquered cuirass of laced plates. Turns aside blows to the chest and belly." },
+	Kote = { Kind = "Wear", Slot = "Sleeve", Description = "Armoured sleeves, plated from shoulder to wrist. Turns aside blows to the arms; the hands stay bare." },
 	Satchel = { Kind = "Wear", Slot = "Back", Capacity = 6, Description = "A small leather bag on a strap." },
 	TravelPack = { Kind = "Wear", Slot = "Back", Capacity = 12, Description = "A framed pack with a rolled blanket on top." },
 	Suneate = { Kind = "Wear", Slot = "Legs", Description = "Plated guards over the thighs and shins." },
@@ -562,16 +574,16 @@ Config.Cloak = {
 			Collar = 0.55, CollarColor = "Trim", Mantle = 0, Clasp = false, Himo = true,
 			Panels = {
 				-- over the chest and shoulders
-				{ "UpperTorso", Vector3.new(0, -0.02, 0.57), Vector3.new(2.12, 1.6, 0.08), "Main" },
-				{ "UpperTorso", Vector3.new(-1.02, -0.02, 0), Vector3.new(0.08, 1.6, 1.22), "Main" },
-				{ "UpperTorso", Vector3.new(1.02, -0.02, 0), Vector3.new(0.08, 1.6, 1.22), "Main" },
-				{ "UpperTorso", Vector3.new(0, 0.82, 0), Vector3.new(2.12, 0.08, 1.22), "Main" },
-				{ "UpperTorso", Vector3.new(-0.68, -0.02, -0.57), Vector3.new(0.76, 1.6, 0.08), "Main" },
-				{ "UpperTorso", Vector3.new(0.68, -0.02, -0.57), Vector3.new(0.76, 1.6, 0.08), "Main" },
-				{ "UpperTorso", Vector3.new(-0.22, -0.02, -0.58), Vector3.new(0.16, 1.6, 0.1), "Trim" },
-				{ "UpperTorso", Vector3.new(0.22, -0.02, -0.58), Vector3.new(0.16, 1.6, 0.1), "Trim" },
-				{ "UpperTorso", Vector3.new(-0.24, 0.84, -0.32), Vector3.new(0.16, 0.1, 0.52), "Trim" },
-				{ "UpperTorso", Vector3.new(0.24, 0.84, -0.32), Vector3.new(0.16, 0.1, 0.52), "Trim" },
+				{ "UpperTorso", Vector3.new(0, -0.02, 0.62), Vector3.new(2.18, 1.6, 0.08), "Main" },
+				{ "UpperTorso", Vector3.new(-1.05, -0.02, 0), Vector3.new(0.08, 1.6, 1.32), "Main" },
+				{ "UpperTorso", Vector3.new(1.05, -0.02, 0), Vector3.new(0.08, 1.6, 1.32), "Main" },
+				{ "UpperTorso", Vector3.new(0, 0.85, 0), Vector3.new(2.18, 0.08, 1.32), "Main" },
+				{ "UpperTorso", Vector3.new(-0.7, -0.02, -0.62), Vector3.new(0.8, 1.6, 0.08), "Main" },
+				{ "UpperTorso", Vector3.new(0.7, -0.02, -0.62), Vector3.new(0.8, 1.6, 0.08), "Main" },
+				{ "UpperTorso", Vector3.new(-0.22, -0.02, -0.63), Vector3.new(0.16, 1.6, 0.1), "Trim" },
+				{ "UpperTorso", Vector3.new(0.22, -0.02, -0.63), Vector3.new(0.16, 1.6, 0.1), "Trim" },
+				{ "UpperTorso", Vector3.new(-0.24, 0.87, -0.36), Vector3.new(0.16, 0.1, 0.56), "Trim" },
+				{ "UpperTorso", Vector3.new(0.24, 0.87, -0.36), Vector3.new(0.16, 0.1, 0.56), "Trim" },
 				-- down to the waist
 				{ "LowerTorso", Vector3.new(0, 0, 0.57), Vector3.new(2.04, 0.92, 0.08), "Main" },
 				{ "LowerTorso", Vector3.new(-0.98, 0, 0), Vector3.new(0.08, 0.92, 1.22), "Main" },

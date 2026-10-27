@@ -23,7 +23,7 @@ local R = Config.Rain
 local Q = Enum.EasingStyle.Quint
 local WIDTH = 400
 local COMPASS = { "N", "NW", "W", "SW", "S", "SE", "E", "NE" } -- yaw 0 blows toward -Z (N), 90 toward -X
-local FILTERS = { "All", "Head", "Neck", "Back", "Legs", "Boots", "Books" }
+local FILTERS = { "All", "Head", "Neck", "Chest", "Sleeve", "Back", "Legs", "Boots", "Books" }
 local PRESETS = {
 	{ "Calm", 0, 0 },
 	{ "Breeze", 12, 0 },
@@ -203,9 +203,9 @@ local function buildItems(page)
 	end)
 	ui.Search = box
 
-	-- filter chips
-	local chips = Theme.new("Frame", { Position = UDim2.fromOffset(0, 48), Size = UDim2.new(1, 0, 0, 28), BackgroundTransparency = 1, Parent = page })
-	Theme.new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder, Parent = chips })
+	-- filter chips (in two rows)
+	local chips = Theme.new("Frame", { Position = UDim2.fromOffset(0, 48), Size = UDim2.new(1, 0, 0, 62), BackgroundTransparency = 1, Parent = page })
+	Theme.new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Wraps = true, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder, Parent = chips })
 	ui.Chips = {}
 	for i, name in ipairs(FILTERS) do
 		local chip = Theme.button(chips, name, 13, {
@@ -227,8 +227,8 @@ local function buildItems(page)
 
 	-- the list
 	local list = Theme.new("ScrollingFrame", {
-		Position = UDim2.fromOffset(0, 86),
-		Size = UDim2.new(1, 0, 1, -130),
+		Position = UDim2.fromOffset(0, 120),
+		Size = UDim2.new(1, 0, 1, -164),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		ScrollBarThickness = 4,

@@ -376,7 +376,7 @@ function CloakView.Build(model, piece, colors, folder, opts)
 	if st.Himo then
 		-- the haori's cord, tied across the chest between the two fronts, with a knot
 		local accent = colors.Accent or main
-		local z = -half.Z - 0.14 * Config.Scale -- over the front panels
+		local z = -half.Z - 0.2 * Config.Scale -- over the front panels
 		local y = half.Y * 0.15
 		for _, sx in ipairs({ -1, 1 }) do
 			local cord = plain("Haori_Himo", Vector3.new(half.X * 0.3, upper.Size.Y * 0.035, 0.05), accent, Enum.Material.Fabric)
