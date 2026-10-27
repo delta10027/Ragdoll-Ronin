@@ -448,7 +448,7 @@ Config.Items = {
 	Cloak = { Kind = "Wear", Slot = "Neck", Description = "A heavy cloak with a mantle over the shoulders. Flows in the wind." },
 	Cape = { Kind = "Wear", Slot = "Neck", Description = "A long, light cape for the road." },
 	Scarf = { Kind = "Wear", Slot = "Neck", Description = "A scarf wound about the neck, its ends trailing behind." },
-	Haori = { Kind = "Wear", Slot = "Neck", Description = "A black jacket worn open over the shoulders, white at the collar, red at the hem and cuffs. Its wide sleeves swing with the arms." },
+	Haori = { Kind = "Wear", Slot = "Neck", Description = "A black jacket worn open over the shoulders, white at the collar, red at the hem and cuffs. Its skirt and wide sleeves swing with the body." },
 	Satchel = { Kind = "Wear", Slot = "Back", Capacity = 6, Description = "A small leather bag on a strap." },
 	TravelPack = { Kind = "Wear", Slot = "Back", Capacity = 12, Description = "A framed pack with a rolled blanket on top." },
 	Suneate = { Kind = "Wear", Slot = "Legs", Description = "Plated guards over the thighs and shins." },
@@ -552,30 +552,57 @@ Config.Cloak = {
 		Cloak = { Collar = 0.7, Mantle = 0.18, Clasp = true, Cols = 4, Rows = 8, Length = 3.3 * S, TopWidth = 1.7 * S, BottomWidth = 2.3 * S },
 		Cape = { Collar = 0, Mantle = 0.07, Clasp = true, Cols = 4, Rows = 9, Length = 3.8 * S, TopWidth = 1.8 * S, BottomWidth = 2.0 * S },
 		Scarf = { Collar = 1.0, Mantle = 0, Clasp = false, Cols = 2, Rows = 6, Length = 1.7 * S, TopWidth = 0.3 * S, BottomWidth = 0.26 * S, Strips = { -0.13 * S, 0.16 * S } },
-		-- the haori: the back and two open fronts from the shoulders to mid-thigh, and a wide sleeve
-		-- hanging around each upper arm. Pins: { part, point in units of its half size }; the
-		-- fronts' inner column is the white lapel, the last row of each sheet the red hem / cuff.
+		-- the haori: the body of the jacket is fabric panels sitting on the body (Panels: { part,
+		-- centre, size } in unscaled studs from the part's centre, and a colour): the back, sides,
+		-- the yoke over the shoulders, two open fronts with white lapels up to the collar, and a
+		-- sleeve over each upper arm. Only the ends are cloth (Sheets, pins in units of the part's
+		-- half size): the skirt below the waist, the back and two fronts (their inner column the
+		-- lapel), and a wide sleeve hanging from each upper arm; their last row is the red hem / cuff.
 		Haori = {
-			Collar = 0.45, CollarColor = "Trim", Mantle = 0, Clasp = false, Himo = true,
+			Collar = 0.55, CollarColor = "Trim", Mantle = 0, Clasp = false, Himo = true,
+			Panels = {
+				-- over the chest and shoulders
+				{ "UpperTorso", Vector3.new(0, -0.02, 0.57), Vector3.new(2.12, 1.6, 0.08), "Main" },
+				{ "UpperTorso", Vector3.new(-1.02, -0.02, 0), Vector3.new(0.08, 1.6, 1.22), "Main" },
+				{ "UpperTorso", Vector3.new(1.02, -0.02, 0), Vector3.new(0.08, 1.6, 1.22), "Main" },
+				{ "UpperTorso", Vector3.new(0, 0.82, 0), Vector3.new(2.12, 0.08, 1.22), "Main" },
+				{ "UpperTorso", Vector3.new(-0.68, -0.02, -0.57), Vector3.new(0.76, 1.6, 0.08), "Main" },
+				{ "UpperTorso", Vector3.new(0.68, -0.02, -0.57), Vector3.new(0.76, 1.6, 0.08), "Main" },
+				{ "UpperTorso", Vector3.new(-0.22, -0.02, -0.58), Vector3.new(0.16, 1.6, 0.1), "Trim" },
+				{ "UpperTorso", Vector3.new(0.22, -0.02, -0.58), Vector3.new(0.16, 1.6, 0.1), "Trim" },
+				{ "UpperTorso", Vector3.new(-0.24, 0.84, -0.32), Vector3.new(0.16, 0.1, 0.52), "Trim" },
+				{ "UpperTorso", Vector3.new(0.24, 0.84, -0.32), Vector3.new(0.16, 0.1, 0.52), "Trim" },
+				-- down to the waist
+				{ "LowerTorso", Vector3.new(0, 0, 0.57), Vector3.new(2.04, 0.92, 0.08), "Main" },
+				{ "LowerTorso", Vector3.new(-0.98, 0, 0), Vector3.new(0.08, 0.92, 1.22), "Main" },
+				{ "LowerTorso", Vector3.new(0.98, 0, 0), Vector3.new(0.08, 0.92, 1.22), "Main" },
+				{ "LowerTorso", Vector3.new(-0.66, 0, -0.57), Vector3.new(0.72, 0.92, 0.08), "Main" },
+				{ "LowerTorso", Vector3.new(0.66, 0, -0.57), Vector3.new(0.72, 0.92, 0.08), "Main" },
+				{ "LowerTorso", Vector3.new(-0.22, 0, -0.58), Vector3.new(0.16, 0.92, 0.1), "Trim" },
+				{ "LowerTorso", Vector3.new(0.22, 0, -0.58), Vector3.new(0.16, 0.92, 0.1), "Trim" },
+				-- the top of each sleeve, capping the shoulder
+				{ "LeftUpperArmP", Vector3.new(0, 0.04, 0), Vector3.new(0.68, 0.72, 0.68), "Main" },
+				{ "RightUpperArmP", Vector3.new(0, 0.04, 0), Vector3.new(0.68, 0.72, 0.68), "Main" },
+			},
 			Sheets = {
-				{ Rows = 8, Length = 2.6 * S, Flare = 1.12, Hem = "Accent", Pins = {
-					{ "UpperTorso", Vector3.new(-1.08, 0.97, 1.25) }, { "UpperTorso", Vector3.new(-0.54, 0.97, 1.25) },
-					{ "UpperTorso", Vector3.new(0, 0.97, 1.25) }, { "UpperTorso", Vector3.new(0.54, 0.97, 1.25) },
-					{ "UpperTorso", Vector3.new(1.08, 0.97, 1.25) } } },
-				{ Rows = 8, Length = 2.6 * S, Trim = 1, Hem = "Accent", Pins = {
-					{ "UpperTorso", Vector3.new(-0.2, 0.97, -1.25) }, { "UpperTorso", Vector3.new(-0.45, 0.97, -1.25) },
-					{ "UpperTorso", Vector3.new(-0.78, 0.97, -1.25) }, { "UpperTorso", Vector3.new(-1.08, 0.97, -1.25) } } },
-				{ Rows = 8, Length = 2.6 * S, Trim = 1, Hem = "Accent", Pins = {
-					{ "UpperTorso", Vector3.new(0.2, 0.97, -1.25) }, { "UpperTorso", Vector3.new(0.45, 0.97, -1.25) },
-					{ "UpperTorso", Vector3.new(0.78, 0.97, -1.25) }, { "UpperTorso", Vector3.new(1.08, 0.97, -1.25) } } },
-				{ Rows = 6, Length = 1.75 * S, Flare = 1.2, Hem = "Accent", Colliders = "LeftArm", Pins = {
-					{ "LeftUpperArmP", Vector3.new(0, 0.8, -1.7) }, { "LeftUpperArmP", Vector3.new(-1.2, 0.8, -1.2) },
-					{ "LeftUpperArmP", Vector3.new(-1.7, 0.8, 0) }, { "LeftUpperArmP", Vector3.new(-1.2, 0.8, 1.2) },
-					{ "LeftUpperArmP", Vector3.new(0, 0.8, 1.7) } } },
-				{ Rows = 6, Length = 1.75 * S, Flare = 1.2, Hem = "Accent", Colliders = "RightArm", Pins = {
-					{ "RightUpperArmP", Vector3.new(0, 0.8, -1.7) }, { "RightUpperArmP", Vector3.new(1.2, 0.8, -1.2) },
-					{ "RightUpperArmP", Vector3.new(1.7, 0.8, 0) }, { "RightUpperArmP", Vector3.new(1.2, 0.8, 1.2) },
-					{ "RightUpperArmP", Vector3.new(0, 0.8, 1.7) } } },
+				{ Rows = 5, Length = 0.85 * S, Flare = 1.1, Hem = "Accent", Pins = {
+					{ "LowerTorso", Vector3.new(-1.27, -0.98, 1.27) }, { "LowerTorso", Vector3.new(-0.64, -0.98, 1.27) },
+					{ "LowerTorso", Vector3.new(0, -0.98, 1.27) }, { "LowerTorso", Vector3.new(0.64, -0.98, 1.27) },
+					{ "LowerTorso", Vector3.new(1.27, -0.98, 1.27) } } },
+				{ Rows = 5, Length = 0.85 * S, Trim = 1, Hem = "Accent", Pins = {
+					{ "LowerTorso", Vector3.new(-0.17, -0.98, -1.27) }, { "LowerTorso", Vector3.new(-0.37, -0.98, -1.27) },
+					{ "LowerTorso", Vector3.new(-0.82, -0.98, -1.27) }, { "LowerTorso", Vector3.new(-1.27, -0.98, -1.27) } } },
+				{ Rows = 5, Length = 0.85 * S, Trim = 1, Hem = "Accent", Pins = {
+					{ "LowerTorso", Vector3.new(0.17, -0.98, -1.27) }, { "LowerTorso", Vector3.new(0.37, -0.98, -1.27) },
+					{ "LowerTorso", Vector3.new(0.82, -0.98, -1.27) }, { "LowerTorso", Vector3.new(1.27, -0.98, -1.27) } } },
+				{ Rows = 5, Length = 0.85 * S, Flare = 1.3, Hem = "Accent", Colliders = "LeftArm", Pins = {
+					{ "LeftUpperArmP", Vector3.new(0, -1.05, -1.45) }, { "LeftUpperArmP", Vector3.new(-1.03, -1.05, -1.03) },
+					{ "LeftUpperArmP", Vector3.new(-1.45, -1.05, 0) }, { "LeftUpperArmP", Vector3.new(-1.03, -1.05, 1.03) },
+					{ "LeftUpperArmP", Vector3.new(0, -1.05, 1.45) } } },
+				{ Rows = 5, Length = 0.85 * S, Flare = 1.3, Hem = "Accent", Colliders = "RightArm", Pins = {
+					{ "RightUpperArmP", Vector3.new(0, -1.05, -1.45) }, { "RightUpperArmP", Vector3.new(1.03, -1.05, -1.03) },
+					{ "RightUpperArmP", Vector3.new(1.45, -1.05, 0) }, { "RightUpperArmP", Vector3.new(1.03, -1.05, 1.03) },
+					{ "RightUpperArmP", Vector3.new(0, -1.05, 1.45) } } },
 			},
 		},
 	},

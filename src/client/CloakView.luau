@@ -11,7 +11,8 @@
 	          AddColliders) and kept above the ground. Each cell is drawn as an anchored panel
 	          between its corners, in the piece's colours (a trim column, a hem row).
 	A style either lists its Sheets (pins on body parts, in units of that part's half size) or
-	gives one cape's size and its Strips (x offsets: a Scarf's two tails).
+	gives one cape's size and its Strips (x offsets: a Scarf's two tails); its Panels are given
+	in unscaled studs from their part's centre.
 	Local parts only, like the armour shells. A sheet stops simulating once its parts are gone
 	(ArmorView took the piece off, or the fighter left the workspace), and is hidden once a part
 	it hangs from is cut off.
@@ -375,7 +376,7 @@ function CloakView.Build(model, piece, colors, folder, opts)
 	if st.Himo then
 		-- the haori's cord, tied across the chest between the two fronts, with a knot
 		local accent = colors.Accent or main
-		local z = -half.Z - CL.BodyMargin * 1.6
+		local z = -half.Z - 0.14 * Config.Scale -- over the front panels
 		local y = half.Y * 0.15
 		for _, sx in ipairs({ -1, 1 }) do
 			local cord = plain("Haori_Himo", Vector3.new(half.X * 0.3, upper.Size.Y * 0.035, 0.05), accent, Enum.Material.Fabric)
@@ -390,6 +391,15 @@ function CloakView.Build(model, piece, colors, folder, opts)
 			local tassel = plain("Haori_Tassel", Vector3.new(0.05, upper.Size.Y * 0.14, 0.05), accent, Enum.Material.Fabric)
 			tassel.CFrame = upper.CFrame * CFrame.new(sx * upper.Size.X * 0.025, y - upper.Size.Y * 0.08, z) * CFrame.Angles(0, 0, sx * math.rad(10))
 			table.insert(list, weldTo(upper, tassel, folder))
+		end
+	end
+
+	for _, pa in ipairs(st.Panels or {}) do
+		local part = model:FindFirstChild(pa[1])
+		if part and part:IsA("BasePart") then
+			local panel = plain("Cloak_Panel", pa[3] * Config.Scale, colors[pa[4]] or main, Enum.Material.Fabric)
+			panel.CFrame = part.CFrame * CFrame.new(pa[2] * Config.Scale)
+			table.insert(list, weldTo(part, panel, folder))
 		end
 	end
 
